@@ -85,6 +85,7 @@ const store = new HyperStore(mkdtempSync(join(tmpdir(), 'dhl-prompt-')))
 const remote = { cfg: { tradingMode: 'live', network: 'mainnet' }, isManaged: () => false, store, desk: { coin: 'BTC', interval: '1h' }, lastLiveAccount: null }
 let text = deskPrompt(remote)
 assert.ok(text.includes('【第一次见面】') && text.includes('hyper_account action=analyze') && !text.includes('最高优先'))
+assert.ok(text.includes('不要调用 hyper_* 工具'), 'plain greetings must not trigger market/book reads')
 assert.ok(text.length < 1700, `the section stays within budget (${text.length} chars)`)
 remote.lastLiveAccount = { at: Date.now(), network: 'mainnet', value: { mode: 'live', positions: [{ coin: 'BTC', size: 0.5 }, { coin: 'ETH', size: -2 }],
   openOrders: [{ coin: 'BTC', side: 'A', isTrigger: true, reduceOnly: true, orderType: 'Stop Market', origSz: '0.5' }, { coin: 'ETH', side: 'B', isTrigger: true, reduceOnly: true, orderType: 'Take Profit Market', origSz: '2' }] } }
