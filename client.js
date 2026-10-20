@@ -23263,8 +23263,16 @@ async function load(target) {
     setState({ ...state, status: "error", error: String(error?.message ?? error) });
   }
 }
+function deskIsMounted() {
+  if (typeof document === "undefined") return true;
+  const query = document.querySelector;
+  if (typeof query !== "function") return true;
+  return query.call(document, ".dhl-root") !== null;
+}
 function openFilePreview(target) {
+  if (!deskIsMounted()) return false;
   void load(target);
+  return true;
 }
 function installFileOpenFallback(ctx) {
   const service = ctx?.sidebarRight ?? ctx?.get?.("sidebarRight");
@@ -23279,7 +23287,8 @@ function installFileOpenFallback(ctx) {
     } catch (error) {
       const target = parseFileAddress(address);
       if (target === void 0) throw error;
-      openFilePreview({ ...target, ...options?.params?.line === void 0 ? {} : { line: options.params.line } });
+      const opened = openFilePreview({ ...target, ...options?.params?.line === void 0 ? {} : { line: options.params.line } });
+      if (!opened) throw error;
       return void 0;
     }
   };

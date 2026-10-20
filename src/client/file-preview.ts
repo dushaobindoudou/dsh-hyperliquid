@@ -111,12 +111,23 @@ async function load(target: FilePreviewTarget): Promise<void> {
   }
 }
 
+/** Whether the desk panel (the only place the preview can render) is on screen. */
+function deskIsMounted(): boolean {
+  if (typeof document === 'undefined') return true
+  const query = (document as any).querySelector
+  if (typeof query !== 'function') return true
+  return query.call(document, '.dhl-root') !== null
+}
+
 /**
  * Show one file in the desk preview.
  * @param target - session, path and optional line to reveal.
+ * @returns false when the desk is not mounted, so the caller can keep the shipped error.
  */
-export function openFilePreview(target: FilePreviewTarget): void {
+export function openFilePreview(target: FilePreviewTarget): boolean {
+  if (!deskIsMounted()) return false
   void load(target)
+  return true
 }
 
 /**
@@ -136,7 +147,8 @@ export function installFileOpenFallback(ctx: any): () => void {
     } catch (error) {
       const target = parseFileAddress(address)
       if (target === undefined) throw error
-      openFilePreview({ ...target, ...(options?.params?.line === undefined ? {} : { line: options.params.line }) })
+      const opened = openFilePreview({ ...target, ...(options?.params?.line === undefined ? {} : { line: options.params.line }) })
+      if (!opened) throw error
       return undefined
     }
   }
