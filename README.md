@@ -3,46 +3,48 @@
 [![npm](https://img.shields.io/npm/v/dsh-hyperliquid.svg)](https://www.npmjs.com/package/dsh-hyperliquid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
 
-Hyperliquid 交易台，运行在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）中。它是一个与 bots 平级的主面板应用：
+[中文](README.zh-CN.md) · [npm](https://www.npmjs.com/package/dsh-hyperliquid) · [Changelog](CHANGELOG.md)
 
-- **左栏 · 交易会话**：每个会话都是一次真实的 DSH 会话，各自记住币种、周期、指标、画线和布局。
-- **中栏 · 行情工作台**：合约统计、K 线（TradingView Lightweight Charts）、资金费历史、盘口与成交、持仓 / 挂单 / 历史委托。
-- **右栏 · 原生会话**：直接嵌入 DSH 原生对话。行情分析、风险检查和下单都由 agent 通过 `hyper_*` 工具完成；交易票据只把结构化的交易意图送进会话。
+A Hyperliquid trading desk that runs inside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) as a peer-level main-panel app:
 
-> ⚠️ **默认连接 Hyperliquid 主网并以实盘模式运行，交易使用真实资金。** 首次使用请先在右上角「交易设置」中切到测试网或模拟盘熟悉流程，并确认下文的交易限额。
+- **Left column · trading sessions**: each session is a real DSH session that remembers its own coin, interval, indicators, drawings and layout.
+- **Middle column · market workbench**: contract stats, candles (TradingView Lightweight Charts), funding history, order book & trades, positions / open orders / history.
+- **Right column · native conversation**: the DSH native chat is embedded directly. Market analysis, risk checks and order placement all go through the agent's `hyper_*` tools; the trade ticket only hands structured intent into the conversation.
 
-## 要求
+> ⚠️ **The plugin connects to Hyperliquid mainnet and runs in live mode by default — real funds.** Switch to testnet or paper mode in the top-right trading settings before your first run, and review the trading limits below.
 
-- DSH **0.2 或更新版本**（嵌入原生会话需要会话引用与 Conversation Factory 接口）
-- Node.js 22.12+（DSH 宿主运行环境）
-- 实盘交易需要配置签名钱包：推荐 [dsh-web3](https://www.npmjs.com/package/dsh-web3) 保险库，或插件内私钥
+## Requirements
 
-## 安装
+- DSH **0.2 or newer** (the embedded native conversation needs session references and the Conversation Factory interface)
+- Node.js 22.12+ (the DSH host runtime)
+- Live trading needs a signing wallet: the [dsh-web3](https://www.npmjs.com/package/dsh-web3) vault (recommended) or a plugin-local private key
+
+## Install
 
 ```bash
 dsh plugin --profile web add dsh-hyperliquid
 ```
 
-本包是一个 dsh bundle（`dsh.bundle.patch` + `dsh.client`），安装后在侧边栏打开「Hyperliquid 交易台」。修改插件配置后需要重启 DSH 宿主。
+The package is a dsh bundle (`dsh.bundle.patch` + `dsh.client`). After installing, open "Hyperliquid 交易台" in the sidebar. Restart the DSH host after changing plugin config.
 
-## 快速上手：配置实盘钱包
+## Quick start: configure a live wallet
 
-推荐使用 dsh-web3 签名：私钥只保存在本机加密保险库中，每次签名都经过钱包的签名策略与审批。
+dsh-web3 signing is recommended: the private key never leaves your local encrypted vault, and every signature passes the wallet's signing policy and approvals.
 
 ```bash
 dsh plugin --profile web add dsh-web3
 ```
 
-在 DSH 设置 → Web3 钱包中创建或导入账户，然后在 profile 的 `cordis.patch.yml` 中配置本插件：
+Create or import an account under DSH Settings → Web3 Wallet, then configure this plugin in the profile's `cordis.patch.yml`:
 
 ```yaml
 - id: hyperliquid
   config:
-    network: mainnet          # 或 testnet
-    tradingMode: live         # 或 paper
+    network: mainnet          # or testnet
+    tradingMode: live         # or paper
     signer: web3
-    web3Account: hyper-agent  # dsh-web3 账户 id 或名称
-    tradingAddress: '0x你的 Hyperliquid 主账户地址'
+    web3Account: hyper-agent  # a dsh-web3 account id or name
+    tradingAddress: '0x your Hyperliquid main account address'
     allowedCoins: BTC,ETH
     maxOrderUsd: 100
     maxDailyUsd: 500
@@ -50,109 +52,115 @@ dsh plugin --profile web add dsh-web3
     maxLeverage: 2
 ```
 
-建议为交易台单独创建 Hyperliquid **API wallet**（agent wallet）用于签名，并把资金主账户填进 `tradingAddress`；持仓与挂单都按主账户查询。
+Create a dedicated Hyperliquid **API wallet** (agent wallet) for the desk and put the funded main account into `tradingAddress`; positions and open orders are always queried against the main account.
 
-## 使用
+## Usage
 
-- **交易设置**：右上角齿轮可切换主网 / 测试网、实盘 / 模拟盘、盘口 / 成交的位置，并编辑允许交易币对、单笔 / 每日 / 仓位限额与最大杠杆。限额保存后立即作用于模拟盘和实盘，并在重启后保持；「恢复插件配置」可清除界面覆盖值。网络与模式切换只在当前宿主进程内生效，重启后恢复插件配置；切到主网实盘前需要确认。
-- **钱包与收益**：点击顶栏钱包查看地址、余额、权益和收益。实盘收益曲线来自 Hyperliquid 官方 portfolio 数据；模拟盘显示本地已实现与未实现收益。
-- **K 线**：支持交易所官方的 14 个周期，以及成交量、SMA20、MA60、EMA20/50、布林带、RSI、MACD、ATR14 与 UTC 日内 VWAP。图表类型可切换蜡烛、美国线、折线、面积和平均 K 线，并随会话保存；平均 K 线仅改变显示，点位引用仍使用原始 OHLC。向左拖动会自动加载更早的 K 线，最多可追溯到交易所提供的最近 5000 根。可以画水平线、趋势线，画线有实时预览和趋势线端点。手动画线与会话中 `hyper_chart` 添加的标注按会话和币种保存，在该币种的所有周期展示；agent 添加或删除后，打开的图表通常在下一次宿主事件轮询（约 1 秒）更新。明确点击 K 线、成交量柱或指标线，会在输入框里插入一个引用标签（如 `BTC 15m 10-15 13:45 · C 81397`）；拖动图表不会引用。发送时标签展开为该点的完整 OHLC、量能与指标数据；点击标签可回到图上的那根 K 线。 「指标」菜单还可叠加最多 8 条可配置均线：SMA / EMA / SMMA（平滑均线，即 TradingView 的 RMA）/ WMA，周期 1–500，价格源可选 close / open / high / low / hl2 / hlc3 / ohlc4，并可再套一层平滑（虚线），算法与 TradingView Pine 一致；图例实时显示数值，agent 也能用 `hyper_chart` 把均线画到图上。
-- **导航与导出**：图表下方可查看最近 1/5/30 天、适应已加载全部数据、跳转到本地时间指定的日期，或回到最新行情；历史不足会自动补取，并在到达数据边界时提示。导出菜单可保存含画线和指标的 PNG，或导出已加载原始 OHLCV 的 CSV（UTC 时间）。指标图例与成交量跟随十字光标；VWAP 使用 UTC 每日重置的 HLC3 成交量加权价格，首日历史不全时不展示该日不完整结果。
-- **画线工具**：工具栏「画线」菜单按 TradingView 的分组提供 78 种工具（菜单顶部可搜索）——线条：趋势线、射线、延长线、信息线（涨跌 / 根数 / 时长 / 角度）、趋势角度、水平线、水平射线、十字线、垂直线；通道：平行通道、安德鲁叉子线、Schiff 与改良 Schiff 叉子线、回归趋势（收盘价最小二乘 ±2σ）、固定范围成交量分布（按价格统计区间成交量，标出 POC 与价值区 VAH / VAL，可调行数与价值区比例；斐波那契回撤、扩展和通道可在浮动工具条自定义层级；由 K 线估算，区间早于已加载历史时自动补加载并提示）；斐波那契与江恩：斐波那契回撤、趋势斐波那契扩展、斐波那契通道、斐波那契时间周期、江恩箱、江恩方格、江恩扇形；形态：艾略特推动浪（0-5）与调整浪（A-B-C）、XABCD 谐波与 ABCD（自动标注斐波那契比值）、头肩形态（含颈线）；形状：矩形、圆形、三角形、画笔；标注：文本、标注气泡、价格标签、箭头、图标；测量与头寸：价格区间、日期区间、日期与价格区间、多头 / 空头头寸（止盈默认 2R，显示 R:R）；0.5.0 新增：平顶 / 平底通道、分离通道、斐波那契速度阻力扇 / 圆 / 弧 / 楔形 / 基于趋势的时间、Cypher、三驱、三角形态、艾略特三角浪与双重 / 三重组合、周期线、正弦线、椭圆、旋转矩形、弧线、曲线、便签、价格便签、路标、预测、锚定 VWAP、锚定成交量分布；0.5.1 新增：荧光笔、路径（逐点点击，双击或 Enter 结束）、折线、图钉、斐波那契螺旋、K 线形态（复制一段 K 线的形状到别处）；0.5.2 新增：投影（扇形）、幽灵 K 线（沿设想路径生成假想 K 线）；0.5.3 新增：锚定文本（固定在屏幕上）、表格（| 分隔单元格，; 分隔行，可固定到屏幕）；0.5.4 新增：固定江恩方格；0.5.5 新增：内部叉子线。点击过程中实时预览，Esc 取消，按住 Shift 把方向约束为水平或 45°；磁吸可选关 / 弱 / 强，吸附到 K 线开高低收。
-- **编辑与管理画线**：点选后拖动锚点改形状、拖动线身整体移动；浮动工具条可通过齿轮精确编辑锚点时间、价格和名称，改颜色、线宽、线型，复制，设为该工具的默认样式（之后新画的同类线自动套用），锁定或删除。按住 Shift 或 Ctrl/Cmd 点击可多选，多选后整组拖动、改色、隐藏、锁定或删除（一步撤销）。快捷键：Alt+T 趋势线、Alt+H 水平线、Alt+J 水平射线、Alt+V 垂直线、Alt+C 十字线、Alt+F 斐波那契回撤、Alt+Shift+R 矩形；画线时按住 Ctrl/Cmd 临时反转磁吸，吸附点显示提示圈；Esc 逐层退出（取消当前拖动或工具 → 取消选择 → 退出放大图表）。Delete 删除，Ctrl/Cmd+C、V 复制粘贴，Ctrl/Cmd+Z 撤销、Shift+Ctrl/Cmd+Z 重做（新建、修改、删除和批量删除都可撤销）。图表下方的画线列表可逐条定位、显示 / 隐藏、锁定或删除；菜单里还有连续绘制、锁定所有画线和删除所有画线。点击菜单中的星标可收藏最多 12 个工具，图表上方显示常用画线快捷栏；收藏保存在当前浏览器。画线锚定在时间与价格上，平移、缩放、切换刻度和加载历史时始终贴合 K 线，也可延伸到最新 K 线右侧的空白区域；画线按会话和币种保存，切换会话随之切换，重启后保留，agent 用 `hyper_chart` 新增或修改的画线会实时出现在打开的图表上。
-- **同步、提醒与贴图**：浮动工具条可把画线「同步到所有会话」（该币种的每个交易会话都显示同一条线，任一会话可修改，重启后保留），水平线、水平射线、趋势线、射线和延长线可开启「价格提醒」——宿主持续监控中价，穿越画线时交易台弹出提醒，提醒触发一次后自动关闭，可再次开启。图标工具附贴图库：18 个内置图标、交易 / 表情 / 符号三类约 60 个贴纸，也可输入或粘贴任意一个 emoji 作为贴纸。每张图（会话 + 币种，跨周期合计）最多 100 条画线。
-- **成交与决策原因**：每笔成交在图上的成交价位置打点（买绿卖红），有 AI 决策原因的点带圆环；点击查看方向、数量、价格、时间和当时的决策原因，「显示 → 成交原因」可把原因标签直接显示在图上。「回到决策会话分析」会切换到做出这笔决策的交易会话，并把成交与原因作为复盘引用放进输入框。
-- **策略框架**：图表工具栏提供趋势跟随、区间突破和波动带回归观察卡，只用已收盘 K 线，标出条件出现、待观察、数据不足或过期；点击「请 Agent 核对」会让会话进一步检查更高周期、盘口、资金费和账户风险，不会自动下单。参数是分析默认值，未证明当前市场和周期的盈利能力。
-- **对话里的交易动作**：agent 的每次 `hyper_*` 调用都以可读的一行显示，例如「交易预检 · 买入 0.001 BTC @ 81,200」；完成后显示结论，展开可看完整返回。
-- **会主动的交易副手**：第一次见面时，agent 先交付价值（有成交历史就做交易体检，没有就用市场雷达给出一个机会并画在图上），再用一句话问你的偏好。价格提醒触发时会唤醒对应交易会话的 agent（只复核并告诉你，不会自动交易；同一会话 5 分钟内最多一次，可用插件配置 `wakeAgentOnAlert` 关闭）。对话栏快捷入口：交易体检、今天有什么机会、帮我盯着仓位、把图上画线变成策略。
-- **托管模式**：右上角设置里选择「半托管」（默认）或「全托管」。半托管：agent 每笔实盘下单、撤单、改杠杆和资金划转都要你批准，允许币对与限额只能由你在「交易限额与签名规则」修改。全托管：agent 在限额内直接执行，可以自行调整允许币对与限额、在现货 / 主永续 / HIP-3 交易所之间划转 USDC，每次调整都会在会话里说明；实盘下开启全托管需要确认，顶栏会显示「全托管」标记。两种模式下 dsh-web3 钱包自身的签名策略都仍然生效。
-- **实盘审批**：agent 下单、撤单或改杠杆需要你批准时，DSH 审批面板里会显示订单卡：方向、数量、价格、预估名义价值、止盈止损、当前网络与模式、交易限额用量，以及 agent 给出的下单理由。
-- **市场选择**：点击合约名或按 `/` 打开市场选择器，支持搜索、分类、排序和自选。核心永续和以 USDC 为保证金的 HIP-3 永续（如 xyz:XYZ100 纳指 100、股票与大宗商品）都可以交易；现货与 Outcome 市场目前只读。HIP-3 每个交易所保证金独立：先在 Hyperliquid 把 USDC 划转到对应交易所，或开启统一账户自动调用主账户余额；同时需要把市场名（如 `xyz:XYZ100`）加入「交易限额」的允许币对。
-- **布局**：三栏都可以收起，分隔条可以拖拽调宽，双击恢复默认宽度。
-- **后台恢复**：页面切到后台会暂停轮询，宿主会释放闲置的行情订阅，但与 Hyperliquid 的连接保持不断。切回前台后会自动重新订阅并补齐数据，期间顶栏显示「同步中」。
+- **Trading settings**: the top-right gear switches mainnet / testnet and live / paper, moves the order book / trades panel, and edits the allowed coins, per-order / daily / position limits and max leverage. Limits apply to paper and live immediately and survive restarts; "restore plugin config" clears UI overrides. Network and mode switches live only inside the current host process and revert on restart; switching to mainnet live requires confirmation.
+- **Wallet & PnL**: the top-bar wallet shows address, balances, equity and PnL. Live PnL curves come from Hyperliquid's official portfolio data; paper mode shows local realized and unrealized PnL.
+- **Candles**: all 14 exchange intervals, plus volume, SMA20, MA60, EMA20/50, Bollinger bands, RSI, MACD, ATR14 and a UTC intraday VWAP. Chart type switches between candles, bars, line, area and Heikin-Ashi per session (Heikin-Ashi changes display only — all price references use raw OHLC). Dragging left loads older history up to the exchange's last 5000 bars. Clicking a candle, volume bar or indicator line inserts a reference tag into the input (e.g. `BTC 15m 10-15 13:45 · C 81397`); sending expands it into full OHLC/volume/indicator data for that bar. The "indicators" menu can also overlay up to 8 configurable moving averages: SMA / EMA / SMMA (smoothed MA, TradingView's RMA) / WMA, periods 1–500, price sources close / open / high / low / hl2 / hlc3 / ohlc4, with optional smoothing (dashed), matching TradingView Pine; the agent can draw MAs onto the chart with `hyper_chart`.
+- **Navigation & export**: below the chart — last 1/5/30 days, fit all loaded data, jump to a local-time date, or back to the latest bar; missing history is fetched automatically with a notice at the data boundary. The export menu saves a PNG with drawings and indicators, or a CSV of the loaded OHLCV (UTC). Indicator legends and volume follow the crosshair; VWAP uses the HLC3 volume-weighted price reset daily at UTC and hides incomplete first days.
+- **Drawing tools**: the toolbar "draw" menu offers 78 TradingView-style tools (searchable at the top) — lines: trend, ray, extended, info (change / bars / duration / angle), trend angle, horizontal, horizontal ray, crossline, vertical; channels: parallel, Andrew's pitchfork, Schiff & modified Schiff, regression (least squares ±2σ), fixed-range volume profile (POC and value area VAH/VAL, adjustable rows and value-area ratio; Fibonacci retracement / extension / channel levels are editable on a floating toolbar; estimated from candles, auto-loads older history when needed); Fibonacci & Gann: retracement, trend-based fib extension, fib channel, fib time zones, Gann box, Gann square, Gann fan; patterns: Elliott impulse (0-5) and correction (A-B-C), XABCD harmonic & ABCD (ratios auto-labeled), head & shoulders (with neckline); shapes: rectangle, circle, triangle, brush; annotations: text, callout, price label, arrow, icon; measurement & positions: price range, date range, date & price range, long / short position (TP defaults to 2R, R:R shown). Recent additions: flat top/bottom channels, disjoint channels, fib speed-resistance fans / circles / arcs / wedges / trend-based time, Cypher, three drives, triangles, Elliott triangle & WXY combos, cycles, sine, ellipse, rotated rectangle, arc, curve, note, price note, signpost, forecast, anchored VWAP, anchored volume profile (0.5.0); highlighter, path (click-by-click, double-click or Enter to finish), polyline, pin, fib spiral, bars pattern (0.5.1); projection (fan), ghost feed (0.5.2); anchored text, table (0.5.3); fixed Gann square (0.5.4); inside pitchfork (0.5.5). Live preview while drawing, Esc to cancel, Shift constrains to horizontal / 45°; magnet snapping (off / weak / strong) to candle OHLC.
+- **Editing & managing drawings**: drag anchors to reshape, drag the body to move; the floating toolbar edits anchor time, price and name precisely, color, width, style, duplicates, sets the tool's default style, locks or deletes. Shift or Ctrl/Cmd-click multi-selects for group move / recolor / hide / lock / delete (one-step undo). Shortcuts: Alt+T trend, Alt+H horizontal, Alt+J h-ray, Alt+V vertical, Alt+C crossline, Alt+F fib retracement, Alt+Shift+R rectangle; hold Ctrl/Cmd while drawing to temporarily invert magnet snapping; Esc exits layer by layer. Delete removes, Ctrl/Cmd+C/V copy-pastes, Ctrl/Cmd+Z / Shift+Ctrl/Cmd+Z undo-redo (create, edit, delete and bulk delete are all undoable). The drawing list below the chart locates, hides, locks or deletes each drawing; the menu adds continuous drawing, lock-all and delete-all. Star up to 12 favorite tools — they appear in a quick bar above the chart (stored per browser). Drawings anchor to time & price, stay glued to candles across pan / zoom / interval switches / history loads, and can extend into empty space right of the latest bar. Drawings are stored per session and coin, survive restarts, and agent-added/edited drawings appear on open charts within the next host event poll (~1s).
+- **Sync, alerts & stickers**: the floating toolbar can sync a drawing "to all sessions" (every session of that coin shows the same line; any session can edit it). Horizontal lines / rays, trend lines, rays and extended lines support **price alerts** — the host watches the mid price and pops a desk alert on cross (fires once, then turns off, can be re-armed). The icon tool ships a sticker library: 18 built-in icons and ~60 stickers across trading / emoji / symbol categories, plus any pasted emoji. Up to 100 drawings per chart (session + coin, across intervals).
+- **Fills & decision reasons**: every fill is dotted on the chart at its price (green buys, red sells); fills with an AI decision reason get a ring — click to see direction, size, price, time and the reason at entry; "show → fill reasons" renders the labels directly on the chart. "Back to the deciding session" switches to the session that made the call and drops the fill + reason into its input as a review reference.
+- **Strategy framework**: the chart toolbar provides trend-following, range-breakout and volatility-band-reversion observation cards that use closed candles only, marking condition-met / watching / insufficient-data / stale; "ask the agent to verify" has the session check higher timeframes, the book, funding and account risk — it never places orders by itself. Parameters are analysis defaults; profitability on any market or interval is not implied.
+- **Trade actions in chat**: every `hyper_*` call renders as one readable line, e.g. "trade pre-check · buy 0.001 BTC @ 81,200"; the conclusion appears when it finishes and the full return expands.
+- **A proactive trading assistant**: on first meeting, the agent delivers value first (a trade review if you have fills, otherwise one scanned opportunity drawn on the chart) and then asks about your preferences once. Price alerts wake the session agent: with the autonomy switch on (below) it runs the full watch loop on its own; otherwise it reviews and reports back (at most once per session per 5 minutes; disable via the `wakeAgentOnAlert` config). Chat-column quick actions: trade review, today's opportunities, watch my position, turn chart drawings into a strategy.
+- **Autonomous watch-loop & permission boundary**: with `agentAutoTradeTestnet: true`, every closed 15m candle wakes the session agent (`[交易台市场检查]` message) and price alerts wake it too (`[交易台事件]`) — this is the desk's main loop, no schedule needed. Each round runs a closed loop: **gather (context / account / multi-timeframe indicators) → assess (one-line market state + check every strategy trigger and invalidation) → adjust (cancel stale orders, update plans and chart alerts) → execute (decide → order, reconcile afterwards) → report (only when something happened)**. While the switch is on (live + full custody, testnet and mainnet alike), automatic rounds hold every trading permission **except withdrawal** — naked opens, cancels, leverage changes, limit changes and transfers all pass; withdrawal is never implemented by this plugin and can only be done by you on the Hyperliquid web UI. With the switch off, automatic rounds keep a degraded allowance: stop-carrying opens, reduce-only and cancels. Risk limits below still apply to every order, and the trader journal's discipline (per-trade risk, daily loss cap, no naked overnight holds) remains a behavioral constraint.
+- **Custody modes**: top-right settings choose "semi-custody" (default) or "full custody". Semi-custody: every live order, cancel, leverage change and transfer needs your approval; allowed coins and limits can only be changed by you in "trading limits & signing rules". Full custody: the agent executes within limits, may adjust allowed coins and limits itself, and may transfer USDC between spot / main perp / HIP-3 exchanges — every adjustment is explained in the session. Enabling full custody on live requires confirmation and the top bar shows a "全托管" badge. In both modes the dsh-web3 wallet's own signing policy still applies.
+- **Live approvals**: when an agent order, cancel or leverage change needs your approval, the DSH approval panel shows an order card: direction, size, price, estimated notional, TP/SL, current network and mode, limit usage, and the agent's stated thesis.
+- **Market picker**: click a contract name or press `/` to open the market picker with search, categories, sorting and favorites. Core perps and USDC-margined HIP-3 perps (e.g. `xyz:XYZ100` Nasdaq-100, stocks and commodities) are tradeable; spot and outcome markets are read-only for now. HIP-3 margin is per exchange: transfer USDC to that exchange on Hyperliquid first, or enable unified account; also add the market name (e.g. `xyz:XYZ100`) to the allowed coins.
+- **Layout**: all three columns collapse; dividers drag to resize; double-click restores default widths.
+- **Background recovery**: switching the tab to the background pauses polling and the host releases idle market subscriptions while keeping the Hyperliquid connection. Returning re-subscribes and backfills automatically; the top bar shows "同步中" meanwhile.
 
-## 交易限额与钱包签名
+## Trading limits & wallet signing
 
-订单要经过两套**相互独立**的规则。当前值与今日用量可在「交易设置 → 交易限额与签名规则」查看。这里保存的限额写入插件数据目录的 `risk-settings.json`，优先于启动时的插件限额配置；恢复插件配置会删除这个覆盖文件。
+Orders pass through two **independent** rule sets. Current values and today's usage are visible in "trading settings → trading limits & signing rules". Saved limits go to `risk-settings.json` in the plugin data directory and take precedence over plugin config at startup; restoring plugin config deletes the override file.
 
-**1. 交易限额**：模拟盘和实盘都检查，两边的每日额度分开记账；减仓与平仓不受限制。
+**1. Trading limits**: enforced for paper and live, with separate daily ledgers; reduce-only orders are never limited.
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `allowedCoins` | `BTC,ETH` | 允许新开仓的永续币对，逗号分隔 |
-| `maxOrderUsd` | `100` | 单笔名义价值上限（USD） |
-| `maxDailyUsd` | `500` | 每 UTC 日累计开仓名义价值上限（USD） |
-| `maxPositionUsd` | `500` | 每个币的最大仓位名义价值（USD） |
-| `maxLeverage` | `2` | 最大杠杆倍数 |
+| `allowedCoins` | `BTC,ETH` | Perp coins allowed for new positions, comma-separated (`*` = all tradable markets) |
+| `maxOrderUsd` | `100` | Max notional per order (USD) |
+| `maxDailyUsd` | `500` | Max cumulative new-position notional per UTC day (USD) |
+| `maxPositionUsd` | `500` | Max position notional per coin (USD) |
+| `maxLeverage` | `2` | Max leverage |
 
-**2. 钱包签名（dsh-web3，仅 `signer: web3` 的实盘订单）**：钱包按自己的签名策略决定一次签名是自动通过、需要审批还是拒绝。它不检查上面的交易限额；签名策略在 DSH 设置 → Web3 钱包中管理。
+**2. Wallet signing (dsh-web3, live orders with `signer: web3` only)**: the wallet's signing policy decides whether a signature passes automatically, needs approval, or is refused. It does not check the trading limits above; the policy is managed in DSH Settings → Web3 Wallet.
 
-另外，`autonomousLive: false`（默认）时，agent 的每笔实盘下单、撤单和杠杆变更都会弹出 DSH 审批。
+Two agent-side switches live on top:
 
-## 全部配置项
+- `autonomousLive: false` (default) — when false, every agent live order, cancel and leverage change pops a DSH approval.
+- `agentAutoTradeTestnet: false` (default) — the autonomy switch for automatic rounds, described above.
 
-| 字段 | 默认 | 说明 |
+## All config options
+
+| Field | Default | Description |
 |---|---|---|
-| `dataDir` | `~/.dsh-hyperliquid` | 会话登记表、会话工作台、模拟账本与审计记录的存储目录 |
+| `dataDir` | `~/.dsh-hyperliquid` | Session registry, session workbenches, paper ledger and audit records |
 | `network` | `mainnet` | `mainnet` / `testnet` |
-| `tradingMode` | `live` | `live` 真实签名下单；`paper` 本地模拟撮合 |
-| `signer` | `local` | `local` 使用插件内私钥签名；`web3` 交给 dsh-web3 保险库签名 |
-| `privateKey` | — | `signer: local` 时使用的私钥，也可以用环境变量 `HYPERLIQUID_PRIVATE_KEY` 提供。请使用 API wallet 密钥，不要使用主钱包私钥 |
-| `web3Account` | `main` | `signer: web3` 时使用的 dsh-web3 账户 id 或名称 |
-| `tradingAddress` | — | Hyperliquid 资金主账户地址；使用 API wallet 签名时必填 |
-| `autonomousLive` | `false` | 允许 agent 在交易限额内自主执行实盘操作，仅支持 `signer: web3` |
-| `allowedCoins` … `maxLeverage` | 见上表 | 交易限额 |
+| `tradingMode` | `live` | `live` signs and sends real orders; `paper` matches locally |
+| `signer` | `local` | `local` signs with a plugin-local private key; `web3` signs via the dsh-web3 vault |
+| `privateKey` | — | Private key for `signer: local`, or env `HYPERLIQUID_PRIVATE_KEY`. Use an API wallet key, never your main wallet's |
+| `web3Account` | `main` | dsh-web3 account id or name for `signer: web3` |
+| `tradingAddress` | — | Hyperliquid funded main account address; required when signing with an API wallet |
+| `autonomousLive` | `false` | Let the agent execute live operations within the trading limits; requires `signer: web3` |
+| `agentAutoTradeTestnet` | `false` | Autonomy switch: closed 15m candles wake the session agent; when on (live + full custody, testnet and mainnet), automatic rounds hold every trading permission except withdrawal — opens with or without a stop, cancels, reduce-only, leverage, limits, transfers |
+| `wakeAgentOnAlert` | `true` | Wake the session agent when a price alert fires (at most once per session per 5 minutes) |
+| `allowedCoins` … `maxLeverage` | see above | Trading limits |
 
-## Agent 工具
+## Agent tools
 
-| 工具 | 说明 |
+| Tool | Description |
 |---|---|
-| `hyper_context` | 一次读取当前会话的币对、盘口、K 线、账户权益、仓位与风险限额 |
-| `hyper_market` | 行情：overview / book / candles / trades / catalog / indicators（SMA、EMA、RSI、MACD、布林带、ATR、Stochastic、ADX/DMI、OBV、支撑阻力，以及图上均线或指定均线的最新值） |
-| `hyper_chart` | 在会话图表上添加、修改（几何 / 颜色 / 线宽 / 线型 / 锁定 / 隐藏）或删除画线（78 种，含固定范围成交量分布、斐波那契、江恩、叉子线、回归、艾略特与谐波形态、标注与多空头寸；可设置同步到所有会话与价格提醒）和均线（SMA / EMA / SMMA / WMA，可选平滑）；`action=view` 切换图表周期并显示 / 隐藏 RSI、MACD 等副图指标 |
-| `hyper_account` | 账户：state / orders / fills / orderStatus（支持 oid、cloid）/ review（窗口证据、成本及订单核对） |
-| `hyper_decide` | 实盘预检：提交交易意图与依据，返回 30 秒内有效的一次性 `decisionId` |
-| `hyper_order` | place / cancel / leverage；实盘下单必须带匹配的 `decisionId`，可附带止盈止损（目前仅测试网） |
-| `hyper_session` | status / bind，同步用户当前查看的币对 |
-| `hyper_account` 托管动作 | `action=limits`（全托管时 agent 可调整允许币对与各项上限）、`action=transfer`（`from` / `to` 取 spot、perp 或 HIP-3 交易所名，自己的任意两个账户之间划转 USDC：现货 ↔ 主永续（usdClassTransfer）、主永续 ↔ HIP-3（sendAsset）一步完成，现货 ↔ HIP-3 与 HIP-3 ↔ HIP-3 自动经主永续两步、只批准一次；半托管每次需批准，全托管直接执行；主钱包签名；统一账户无需现货 ↔ 永续划转） |
-| 交易体检与市场雷达 | `hyper_account action=analyze`：按完整往返统计近 7/30/90 天的胜率、盈亏比、期望、持仓时长、按币种/时段/星期的表现、手续费与资金费，并按金额列出习惯问题和建议规则（样本少于 10 笔往返时不下结论）；`hyper_market action=scan`：扫描流动性最好的约 20 个可交易永续，给出贴近/突破区间、资金费极值、24h 涨跌和溢价的前几名 |
-| `hyper_journal` | 交易员日志（跨会话保留）：交易员档案（风险偏好、持仓周期、打扰偏好等）、策略库（版本与每次修订原因，按 paper / live 分开统计笔数、胜率、期望 R）、交易计划 / 结果 / 复盘 / 教训记录；摘要自动带入每个会话的系统提示 |
+| `hyper_context` | One call for the session's coin, book, candles, account equity, positions and risk limits |
+| `hyper_market` | Market data: overview / book / candles / trades / catalog / indicators (SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, ADX/DMI, OBV, support & resistance, plus on-chart or specified MA values) |
+| `hyper_chart` | Add, edit (geometry / color / width / style / lock / hide) or remove drawings (78 kinds incl. fixed-range volume profile, Fibonacci, Gann, pitchforks, regression, Elliott & harmonic patterns, annotations, long/short positions; per-session sync and price alerts) and moving averages (SMA / EMA / SMMA / WMA with optional smoothing); `action=view` switches the chart interval and toggles RSI, MACD and other sub-panes |
+| `hyper_account` | Account: state / orders / fills / orderStatus (oid or cloid) / review (window evidence, costs, order reconciliation) |
+| `hyper_decide` | Live pre-check: submit a trade intent with its thesis, get a one-time `decisionId` valid for 30 seconds |
+| `hyper_order` | place / cancel / leverage; live orders must carry a matching `decisionId` and may attach TP/SL (testnet only) |
+| `hyper_session` | status / bind, syncing the coin the user is currently viewing |
+| `hyper_account` custody actions | `action=limits` (full custody: the agent adjusts allowed coins and caps) and `action=transfer` (`from`/`to` = spot, perp or a HIP-3 exchange name; USDC moves between any two of your own accounts: spot ↔ main perp via `usdClassTransfer`, main perp ↔ HIP-3 via `sendAsset` in one step, spot ↔ HIP-3 and HIP-3 ↔ HIP-3 route through the main perp in two steps with a single approval; main-wallet signed; unified accounts need no spot ↔ perp transfer) |
+| Trade review & market radar | `hyper_account action=analyze`: full round-trip stats for the last 7/30/90 days — win rate, payoff, expectancy, hold time, performance by coin / session / weekday, fees and funding, habit problems ranked by cost with suggested rules (no conclusions under 10 round trips); `hyper_market action=scan`: scans the ~20 most liquid tradeable perps for range approaches / breaks, funding extremes, 24h moves and premiums |
+| `hyper_journal` | Trader journal (survives sessions): trader profile (risk appetite, holding period, interruption preference…), strategy library (versions with revision reasons, per-paper/live stats for count, win rate, expectancy R), plan / result / review / lesson entries; summaries flow into every session's system prompt |
 
-插件还会向 DSH 注册随包提供的 [`hyperliquid-trading` skill](skills/hyperliquid-trading/SKILL.md)，指导 agent 先核对数据新鲜度、账户与风险，再区分分析和执行，回执异常时先对账。
+The plugin also registers the bundled [`hyperliquid-trading` skill](skills/hyperliquid-trading/SKILL.md), teaching the agent to verify data freshness, account and risk before separating analysis from execution, and to reconcile before retrying after any receipt anomaly.
 
-## 多周期、指标与复盘
+## Multi-timeframe research & review
 
-图表支持双图 / 四图研究、时间及光标联动；指标菜单支持 RSI/MACD/BOLL/Stochastic/ADX 参数、跨会话指标模板和数据窗口。底部「交易复盘」核对成交、委托、原因和费用，显示数据覆盖缺口，可导出证据或交给 AI。详细口径见 [研究与复盘说明](docs/research-review-2026-10-16.md)。
+The chart supports 2-up / 4-up research layouts with linked time and crosshairs; the indicator menu covers RSI/MACD/BOLL/Stochastic/ADX parameters, cross-session indicator templates and the data window. The bottom "trade review" panel reconciles fills, orders, reasons and fees, shows data-coverage gaps, and can export evidence or hand it to the AI. Details in the [research & review notes](docs/research-review-2026-10-16.md) (Chinese).
 
-## 安全设计
+## Security design
 
-- 实盘下单分两步：先用 `hyper_decide` 预检，再用 `hyper_order` 执行。执行时宿主会重新读取行情和账户；价格偏离预检超过 1% 时拒绝下单。
-- 每笔实盘订单都带 128 位 `cloid` 并写入本地审计。网络超时后，额度会保守保留，需要先按 `cloid` 核对交易所状态。
-- 网络或交易模式切换时，会清空所有行情缓存和未消费的预检决策；有交易正在执行时拒绝切换。
-- 行情或宿主数据过期时，交易票据暂停提交。
-- 签名实现按官方 Python SDK `signing.py` 逐字节复刻，并用官方测试向量验证；local 和 web3 两条签名路径的结果一致。
+- Live orders are two-step: `hyper_decide` pre-check first, then `hyper_order`. At execution the host re-reads market and account data and refuses when price drifted more than 1% from the pre-check.
+- Every live order carries a 128-bit `cloid` and is written to the local audit log. After a network timeout, quota is conservatively retained until the exchange state is reconciled by `cloid`.
+- Network or trading-mode switches clear all market caches and unconsumed pre-check decisions and are refused while a trade is executing.
+- The trade ticket pauses submission when market or host data is stale.
+- The signing implementation replicates the official Python SDK `signing.py` byte-for-byte and is verified against the official test vectors; local and web3 signing paths produce identical results.
 
-## 已知限制
+## Known limitations
 
-- 模拟盘手续费及不利滑点可在交易限额设置中配置（默认 4.5 / 5 bps），新成交实际扣费并保留当时假设；不模拟盘口深度、资金费和强平，模拟收益不能直接代表实盘收益。模拟盘也不支持止盈止损触发单。
-- 带止盈止损的分组订单（`normalTpsl`）目前只在测试网开放。保护单在主单完全成交后才会挂出；执行后请核对真实持仓与保护挂单。
-- Portfolio Margin 账户中的非 USDC 资产不计入风控权益，因此可能被保守拒单。
+- Paper fees and adverse slippage are configurable in the trading limits settings (defaults 4.5 / 5 bps) and are actually charged on new fills with the assumptions of that moment. Paper does not simulate order-book depth, funding or liquidations, and paper PnL does not translate to live performance. Paper TP/SL bracket orders are simulated locally (trigger execution, OCO pairing, restart dedupe).
+- Grouped TP/SL orders (`normalTpsl`) are currently testnet-only for live trading. Protection orders only rest after the parent fills completely; after execution reconcile the real position and the protection orders.
+- Non-USDC assets in Portfolio Margin accounts do not count toward risk-check equity and may cause conservative rejections.
 
-## 开发
+## Development
 
 ```bash
 npm install
-npm run build      # src/client → client.js（构建产物，请勿手改）
+npm run build      # src/client → client.js (build artifact, do not hand-edit)
 npm run typecheck
 npm test
-npm run smoke:chart     # 基础图表：类型/坐标编辑/指标光标/日期导航/图片及 CSV 导出/恢复
-npm run smoke:drawing   # 真实 DSH 宿主 + Chrome：画线交互、重启保持、全部工具、成交打点与平移性能
+npm run smoke:chart     # base chart: types / coordinate editing / indicator crosshair / date nav / PNG & CSV export / restore
+npm run smoke:drawing   # real DSH host + Chrome: drawing interaction, restart persistence, all tools, fill dots, pan performance
 ```
 
-- 源码结构：`index.js` 与 `lib/*.js` 是宿主端代码，纯 ESM，无需构建；`src/client/` 是客户端（React + TSX），由 esbuild 打包成 `client.js`。
-- 架构说明见 [docs/architecture.md](docs/architecture.md)。
-- 修改宿主端代码后需要重启 DSH 宿主；`npm run build` 只更新客户端。
+- Source layout: `index.js` and `lib/*.js` are host-side pure-ESM code with no build step; `src/client/` is the client (React + TSX) bundled to `client.js` by esbuild.
+- Architecture notes in [docs/architecture.md](docs/architecture.md) (Chinese).
+- Restart the DSH host after changing host-side code; `npm run build` only updates the client. Run `npm test` (37 files) before every commit — the suite must be green.
 
 ## License
 
-MIT。第三方组件声明见 [NOTICE](NOTICE)。
+MIT — see [LICENSE](LICENSE). Third-party notices in [NOTICE](NOTICE).

@@ -1,7 +1,7 @@
 {
   "name": "dsh-hyperliquid",
   "version": "0.5.9",
-  "description": "Hyperliquid trading desk for the DeepSeek Harness (dsh) - market workspace, native agent conversation and guarded live / paper trading over the Hyperliquid API.",
+  "description": "Hyperliquid trading desk for the DeepSeek Harness (dsh) - market workspace, native agent conversation, guarded live / paper trading and an autonomous watch-loop over the Hyperliquid API.",
   "icon": "./icon.svg",
   "type": "module",
   "main": "index.js",
@@ -20,7 +20,9 @@
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
+    "README.zh-CN.md",
     "CHANGELOG.md",
+    "LICENSE",
     "NOTICE",
     "docs/research-review-2026-10-16.md"
   ],
@@ -52,10 +54,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dushaobindoudou/dsh-plugin.git",
-    "directory": "packages/dsh-hyperliquid"
+    "url": "git+https://github.com/dushaobindoudou/dsh-hyperliquid.git"
   },
-  "homepage": "https://github.com/dushaobindoudou/dsh-plugin/tree/main/packages/dsh-hyperliquid#readme",
+  "homepage": "https://github.com/dushaobindoudou/dsh-hyperliquid#readme",
+  "bugs": {
+    "url": "https://github.com/dushaobindoudou/dsh-hyperliquid/issues"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
