@@ -1,0 +1,30 @@
+# NOTICE — dsh-hyperliquid
+
+## Vendored third-party software
+
+**TradingView Lightweight Charts™ v5.2.1** (bundled into client.js by esbuild from the npm package)
+Copyright (c) 2026 TradingView, Inc.
+Licensed under the Apache License, Version 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+
+**@nktkas/hyperliquid v0.33.x** (host-side data plane: /info + WebSocket subscriptions)
+Copyright (c) nktkas and contributors — MIT License (see node_modules/@nktkas/hyperliquid/LICENSE).
+Used for market data transport with automatic reconnection and re-subscription.
+
+## Execution path
+
+Order signing and exchange submission remain this package's own EIP-712
+implementation (`lib/signing.js`), byte-for-byte validated against the official
+hyperliquid-python-sdk vectors (test/signing.test.mjs). The official
+Hyperliquid frontend is closed source; UI patterns reference the open-source
+Superior-Trade/trading-terminal (Apache-2.0) and the production site's public
+interface.
+
+## Brand
+
+The Hyperliquid mark is traced from the official app icon
+(app.hyperliquid.xyz/android-chrome-512x512.png, #97FCE4). Hyperliquid and its
+logos are trademarks of Hyperliquid Labs; this package is an independent
+integration, not an official Hyperliquid product.
+
+**Lucide icons** (the settings gear outline in src/client/components/panel-icons.tsx)
+Copyright (c) Lucide Contributors — ISC License, https://lucide.dev/license

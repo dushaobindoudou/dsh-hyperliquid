@@ -1,0 +1,147 @@
+// Exercise public controls in a real host: chart types, studies, navigation, exports and restore.
+import { readFile } from 'node:fs/promises'
+import { build } from 'esbuild'
+import { chromium, CHROME, readUrl, openDesk, waitCandles, check, openList } from './common.mjs'
+
+const compiled = await build({ entryPoints: ['src/client/chart-indicators.ts'], bundle: true, write: false, format: 'esm', platform: 'node' })
+const { chartIndicators } = await import('data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].text).toString('base64'))
+const url = await readUrl()
+const browser = await chromium.launch({ headless: true, executablePath: CHROME })
+try {
+  const page = await browser.newPage({ viewport: { width: 2100, height: 1100 }, timezoneId: 'UTC' })
+  const errors = []; page.on('pageerror', (error) => errors.push(error.message))
+  await openDesk(page, url)
+  await page.getByRole('button', { name: /新建交易会话/ }).click()
+  await waitCandles(page)
+  const state = () => page.evaluate(() => { const s = window.__dhlStore.get(); return { candles: s.candles, workspace: s.workspace, marks: s.chartMarks, sessionId: s.activeSessionId, coin: s.activeCoin, interval: s.interval } })
+  const first = await state()
+  const scope = `${first.coin}:${first.interval}`
+  const chartType = page.getByRole('combobox', { name: '图表类型', exact: true })
+  await page.getByRole('button', { name: '常用 趋势线', exact: true }).click()
+  let box = await page.locator('.dhl-chart canvas').first().boundingBox()
+  await page.mouse.click(box.x + box.width * .35, box.y + box.height * .6)
+  await page.mouse.click(box.x + box.width * .6, box.y + box.height * .4)
+  await page.waitForFunction(() => window.__dhlStore.get().chartMarks.length > 0)
+  const trend = (await state()).marks.at(-1)
+  await (await openList(page)).locator('.dhl-drawing-list-name').last().click()
+  await page.locator('.dhl-draw-toolbar .dhl-swatch').nth(4).click()
+  await page.waitForFunction((id) => window.__dhlStore.get().chartMarks.find((m) => m.id === id)?.color === '#9b86db', trend.id)
+  await page.getByRole('button', { name: '编辑画线坐标', exact: true }).click()
+  const editor = page.getByRole('dialog').filter({ has: page.locator('.dhl-coordinate-editor') })
+  await editor.getByRole('spinbutton', { name: '锚点 1 价格', exact: true }).fill('0')
+  await editor.getByRole('button', { name: '应用坐标', exact: true }).click()
+  check(await editor.getByRole('alert').isVisible(), 'coordinate editor rejects an invalid price')
+  await editor.getByRole('spinbutton', { name: '锚点 1 价格', exact: true }).fill(String(trend.fromPrice + 1))
+  await editor.getByRole('textbox', { name: '画线名称', exact: true }).fill('精确坐标测试')
+  await editor.getByRole('button', { name: '应用坐标', exact: true }).click()
+  await page.waitForFunction(([id, price]) => window.__dhlStore.get().chartMarks.find((m) => m.id === id)?.fromPrice === price, [trend.id, trend.fromPrice + 1])
+  check((await state()).marks.find((m) => m.id === trend.id).label === '精确坐标测试', 'coordinate and label changes are saved')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await page.waitForFunction(([id, price]) => window.__dhlStore.get().chartMarks.find((m) => m.id === id)?.fromPrice === price, [trend.id, trend.fromPrice])
+  check((await state()).marks.find((m) => m.id === trend.id).label === trend.label, 'coordinate edit is one undoable operation')
+  await page.keyboard.press('Escape')
+  for (const type of ['line', 'area', 'bars', 'heikinAshi', 'candles']) {
+    await chartType.selectOption(type); await page.waitForTimeout(450)
+    check(await page.locator(`.dhl-drawing[data-mark-id="${trend.id}"]`).count() === 1 && (await state()).workspace.chartType === type, `${type}: renders with the saved drawing`)
+  }
+  await page.locator('.dhl-indicator-menu summary').click()
+  for (const name of ['RSI 14', 'MACD', 'ATR 14', 'VWAP · UTC']) await page.locator('.dhl-indicator-popover').getByRole('button', { name: new RegExp('^' + name.replace('·', '\\·')) }).click()
+  await page.locator('.dhl-indicator-menu summary').click()
+  await page.waitForTimeout(800)
+  box = await page.locator('.dhl-chart canvas').first().boundingBox()
+  await page.mouse.move(box.x + box.width * .45, box.y + 70)
+  await page.waitForTimeout(200)
+  const time = Number(await page.locator('.dhl-chart-ohlc').getAttribute('data-time'))
+  const current = await state(), values = chartIndicators(current.candles)
+  check(time > 0 && time < current.candles.at(-1).t, 'crosshair inspects a historical bar')
+  for (const [label, key] of [['RSI14', 'rsi14'], ['MACD', 'macd'], ['ATR14', 'atr14']]) {
+    const expected = values[key].find((point) => point.time === time / 1000)?.value
+    const shown = await page.locator(`[data-study="${label}"] b`).textContent()
+    check(shown === Number(expected.toPrecision(7)).toLocaleString('en-US', { maximumFractionDigits: 7 }), `${label} follows the crosshair`)
+  }
+  await page.locator('.dhl-draw-menu summary').click()
+  await page.getByRole('button', { name: '收藏 水平射线', exact: true }).click()
+  await page.locator('.dhl-draw-menu summary').click()
+  check(await page.getByRole('button', { name: '常用 水平射线', exact: true }).count() === 1, 'starring a tool adds it to the quick toolbar')
+  await page.getByRole('button', { name: '1D', exact: true }).click(); await page.waitForTimeout(900)
+  let range = (await state()).workspace.chartRanges[scope]
+  check(range && range.to - range.from <= 90_000, '1D selects one day without changing the candle interval', range)
+  const target = (await state()).candles[0].t - 2 * 3600_000
+  const dateSummary = page.locator('summary[aria-label="跳转到日期"]')
+  await dateSummary.click()
+  await page.locator('#dhl-chart-date').fill(new Date(target).toISOString().slice(0, 16))
+  await page.getByRole('button', { name: '定位 K 线', exact: true }).click()
+  await page.waitForFunction((time) => window.__dhlStore.get().candles[0].t <= time || window.__dhlStore.get().candlesOlder === 'done', target, { timeout: 30_000 })
+  await page.waitForTimeout(1000)
+  range = (await state()).workspace.chartRanges[scope]
+  check(range && range.from * 1000 <= target && range.to * 1000 >= target, 'go-to-date pages in history and centers the requested bar', { range, target, head: (await state()).candles[0].t, notices: await page.evaluate(() => window.__dhlStore.get().notices) })
+  await page.getByRole('button', { name: '回到最新', exact: true }).click(); await page.waitForTimeout(900)
+  const live = await state(); range = live.workspace.chartRanges[scope]
+  check(range.to * 1000 >= live.candles.at(-2).t, 'Latest returns the viewport to the live end')
+  await chartType.selectOption('area'); await page.waitForTimeout(500)
+  const exportSummary = page.locator('summary[aria-label="导出图表"]')
+  await exportSummary.click()
+  const csvDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: '已加载 K 线 CSV', exact: true }).click()
+  const csv = await readFile(await (await csvDownload).path(), 'utf8')
+  check(csv.includes('time_utc,open,high,low,close,volume') && csv.includes(first.coin), 'CSV downloads real exchange OHLCV')
+  await page.getByRole('button', { name: '全部', exact: true }).click(); await page.waitForTimeout(500)
+  await exportSummary.click()
+  const pngDownload = page.waitForEvent('download', { timeout: 20_000 })
+  await page.getByRole('button', { name: '图片 PNG（含画线）', exact: true }).click()
+  const png = await readFile(await (await pngDownload).path())
+  const pixels = await page.evaluate(async (base64) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + base64; await img.decode()
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height
+    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0)
+    const p = ctx.getImageData(0, 0, c.width, c.height).data; let violet = 0
+    for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i] - 155) < 3 && Math.abs(p[i + 1] - 134) < 3 && Math.abs(p[i + 2] - 219) < 3) violet++
+    return { width: c.width, height: c.height, alpha: p[3], violet }
+  }, png.toString('base64'))
+  check(pixels.width > 300 && pixels.height > 400 && pixels.alpha === 255 && pixels.violet > 30, 'PNG includes the SVG trend and an opaque background', pixels)
+  await page.reload(); await openDesk(page, url); await waitCandles(page)
+  await page.waitForFunction(() => window.__dhlStore.get().nativeSessionsReady, null, { timeout: 15_000 })
+  await page.locator('.dhl-chatmount').waitFor({ state: 'visible', timeout: 15_000 })
+  check(await page.locator('.dhl-col-chat [role="alert"]').count() === 0, 'native session catalog and embedded conversation recover after reload')
+  check((await state()).workspace.chartType === 'area' && (await state()).workspace.indicators.includes('atr14'), 'chart type and studies survive reload')
+  check(await page.getByRole('button', { name: '常用 水平射线', exact: true }).count() === 1, 'favorite tools survive reload')
+  check((await state()).marks.some((m) => m.id === trend.id), 'drawings survive chart type changes and reload')
+  // The drawing list floats: opening it does not push the chart controls below it.
+  // Measured relative to the list header (clicking it may scroll the page into view).
+  const listHead = page.locator('.dhl-drawing-list-head').first()
+  await listHead.scrollIntoViewIfNeeded()
+  const gap = async () => (await page.locator('.dhl-chart-navigation').boundingBox()).y - (await listHead.boundingBox()).y
+  const gapBefore = await gap()
+  check(await listHead.getAttribute('aria-expanded') === 'false', 'the drawing list starts closed')
+  await listHead.click(); await page.waitForTimeout(200)
+  const gapOpen = await gap()
+  check(await listHead.getAttribute('aria-expanded') === 'true' && await page.locator('.dhl-drawing-list ul').isVisible() && Math.abs(gapOpen - gapBefore) < 1,
+    'opening the drawing list leaves the chart controls where they are', { gapBefore, gapOpen })
+  const outside = await page.locator('.dhl-market-trigger').boundingBox()
+  await page.mouse.click(outside.x + outside.width / 2, outside.y + outside.height / 2); await page.waitForTimeout(200)
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150)
+  check(await listHead.getAttribute('aria-expanded') === 'false', 'a press outside closes the drawing list')
+  await listHead.click(); await page.waitForTimeout(150)
+  await page.locator('.dhl-drawing-list .dhl-drawing-list-name').first().click(); await page.waitForTimeout(300)
+  check(await listHead.getAttribute('aria-expanded') === 'false' && await page.locator('.dhl-draw-toolbar').count() === 1, 'picking a drawing from the list selects it and closes the list (so it does not cover it)')
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150)
+  // Fullscreen: the browser goes fullscreen and the chart fills the screen edge to edge.
+  await page.getByRole('button', { name: '全屏图表', exact: true }).click(); await page.waitForTimeout(700)
+  const fs = await page.evaluate(() => ({ element: document.fullscreenElement === document.documentElement, panel: document.querySelector('.dhl-chart-panel')?.className ?? '' }))
+  check(fs.element && fs.panel.includes('is-fullscreen'), 'the fullscreen button enters real browser fullscreen', fs)
+  const expanded = await page.locator('.dhl-chart-panel-expanded').boundingBox()
+  const vp = page.viewportSize()
+  check(expanded.x <= 0.5 && expanded.y <= 0.5 && Math.abs(expanded.width - vp.width) < 1 && Math.abs(expanded.height - vp.height) < 1, 'the fullscreen chart fills the screen edge to edge', { expanded, vp })
+  const navigation = await page.locator('.dhl-chart-navigation').boundingBox()
+  check(navigation.y + navigation.height <= expanded.y + expanded.height, 'expanded chart keeps navigation visible')
+  await page.getByRole('button', { name: '退出全屏图表', exact: true }).click(); await page.waitForTimeout(500)
+  check(await page.evaluate(() => document.fullscreenElement === null) && await page.locator('.dhl-chart-panel-expanded').count() === 0, 'leaving restores the page and leaves browser fullscreen')
+  // Leaving from the browser side (as Esc / F11 would) also leaves the expanded chart.
+  await page.getByRole('button', { name: '全屏图表', exact: true }).click(); await page.waitForTimeout(500)
+  await page.evaluate(() => document.exitFullscreen()); await page.waitForTimeout(500)
+  check(await page.locator('.dhl-chart-panel-expanded').count() === 0, 'leaving fullscreen from the browser also leaves the expanded chart')
+  await page.setViewportSize({ width: 1400, height: 1000 })
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: '/tmp/dsh-hyperliquid-chart-basics.png' })
+  check(errors.length === 0, 'no browser errors', errors)
+} finally { await browser.close() }

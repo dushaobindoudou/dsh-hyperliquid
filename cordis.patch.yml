@@ -1,0 +1,7 @@
+- insert:
+    - id: hyperliquid
+      name: dsh-hyperliquid
+      config:
+        dataDir: '~/.dsh-hyperliquid'
+        network: mainnet
+        tradingMode: live
