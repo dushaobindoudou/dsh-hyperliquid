@@ -20,8 +20,7 @@ const origins=new Map()
 const authorize=createTurnOriginGuard({on:(_name,fn)=>{listener=fn}},{origin:{get:(id)=>origins.get(id),set:(id,v)=>origins.set(id,v)}}), session={id:'s1'}, exec={agent:{id:'s1',session}}
 // Turn not observed and no persisted alert origin: a normal (e.g. paper) order is allowed.
 authorize('hyper_order',{},exec)
-// Owner mandate (2026-10-20): turn origin no longer restricts money tools — a plugin reload mid-alert
-// turn, unobserved turns and human turns all hold the same permissions; only withdrawal is refused.
+// A plugin reload mid-alert retains the automatic turn's restrictions.
 {
   const { mkdtempSync } = await import('node:fs'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path')
   const { HyperStore } = await import('../lib/store.js')
@@ -31,8 +30,8 @@ authorize('hyper_order',{},exec)
   const s2 = { id: 's2' }, exec2 = { agent: { id: 's2', session: s2 } }
   hear(s2, { type: 'turn/start' }); hear(s2, { type: 'user/message', data: { source: { kind: 'plugin:dsh-hyperliquid', form: 'event' } } })
   let hear2; const reloaded = createTurnOriginGuard({ on: (_n, fn) => { hear2 = fn } }, { origin: { get: (id) => new HyperStore(store.dataDir).alertOrigin(id), set: persisted.set } })
-  reloaded('hyper_order', {}, exec2)
-  reloaded('hyper_account', { action: 'transfer' }, exec2)
+  assert.throws(() => reloaded('hyper_order', {}, exec2), /自动通知/)
+  assert.throws(() => reloaded('hyper_account', { action: 'transfer' }, exec2), /自动通知/)
   assert.throws(() => reloaded('hyper_account', { action: 'withdraw' }, exec2), /提现/, 'withdrawal stays refused after a reload')
   hear2(s2, { type: 'turn/start' }); hear2(s2, { type: 'user/message', data: { source: { kind: 'schedule' } } })
   reloaded('hyper_order', { action: 'cancel', oid: 1 }, exec2)

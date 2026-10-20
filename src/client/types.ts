@@ -58,6 +58,9 @@ export interface SessionRow {
   title: string | null
   createdAt?: number
   updatedAt?: number
+  strategyScopeId?: string
+  tradingEnabled?: boolean
+  requirePosition?: boolean
 }
 
 export interface MarketEntry {

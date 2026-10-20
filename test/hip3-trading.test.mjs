@@ -25,6 +25,7 @@ remote.client = {
     if (type === 'meta' && extra.dex === 'flx') return { collateralToken: 360, universe: [{ name: 'flx:TSLA', szDecimals: 2, maxLeverage: 10 }] }
     if (type === 'allMids' && extra.dex === 'xyz') return { 'xyz:XYZ100': '30000', 'xyz:GOLD': '4000' }
     if (type === 'clearinghouseState' && extra.dex === 'xyz') return { assetPositions: [], marginSummary: { accountValue: '0' }, withdrawable: '0' }
+    if (type === 'frontendOpenOrders' && extra.dex === 'xyz') return [{ coin: 'xyz:XYZ100', oid: 42, cloid: 'owned-hip3' }]
     throw new Error(`unexpected info ${type} ${JSON.stringify(extra)}`)
   },
   async allMids() { return { BTC: '80000' } },
@@ -42,6 +43,8 @@ assert.equal(await remote.midOf('xyz:XYZ100'), 30000, 'HIP-3 mids come from the 
 
 // cancel and leverage address the HIP-3 asset id
 const submitted = []
+remote.resolveAddress = async () => '0x0000000000000000000000000000000000000001'
+remote.store.recordLiveOrder('owned-hip3', { sessionId: 's1', coin: 'xyz:XYZ100', network: 'mainnet', address: await remote.resolveAddress(), orderIds: [42] })
 remote.submitAction = async (action) => { submitted.push(action); return { status: 'ok', response: { type: 'default' } } }
 await remote.executeToolCancel({ coin: 'xyz:XYZ100', oid: 42 }, { agent: { id: 's1' } })
 assert.deepEqual(submitted.at(-1), { type: 'cancel', cancels: [{ a: 110000, o: 42 }] })

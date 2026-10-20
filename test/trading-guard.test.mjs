@@ -137,7 +137,15 @@ remote.client.userAbstraction = async () => 'default'
 await assert.rejects(remote.prepareOrder({ ...bracketIntent, takeProfitPx: 90 }, 'session-1'), /止盈价/)
 await assert.rejects(remote.prepareOrder({ ...bracketIntent, stopLossPx: 110 }, 'session-1'), /止损价/)
 remote.cfg.network = 'mainnet'
-await assert.rejects(remote.prepareOrder(bracketIntent, 'session-1'), /仅在 testnet/)
+remote.submitAction = async (action) => {
+  bracketAction = action
+  return { status: 'ok', response: { data: { statuses: [{ filled: { totalSz: String(bracketIntent.sz) } }, { resting: { oid: 8 } }, { resting: { oid: 9 } }] } } }
+}
+const mainnetPlan = await remote.prepareOrder(bracketIntent, 'session-1')
+const mainnetResult = await remote.executeToolOrder({ ...bracketIntent, decisionId: mainnetPlan.decisionId }, exec, 'session-1')
+assert.equal(bracketAction.grouping, 'normalTpsl')
+assert.equal(bracketAction.orders[2].t.trigger.tpsl, 'sl')
+assert.equal(mainnetResult.protectionState, 'verify-active')
 
 writeFileSync(join(dir, 'live-budget.json'), '{broken')
 assert.throws(() => new TradingGuard(dir, limits), /Unexpected|JSON/)

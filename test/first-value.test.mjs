@@ -68,7 +68,7 @@ assert.equal(waker.notify(ev('a', 0)), true); assert.equal(waker.notify(ev('a', 
 waker.notify(ev('b', 1000))
 await run(5_000)
 assert.equal(delivered.length, 1); assert.ok(delivered[0].text.includes('支撑') && delivered[0].text.split('\n').filter((l) => l.startsWith('- ')).length === 2, 'two alerts merged into one wake-up')
-assert.ok(delivered[0].text.includes('按盯盘闭环自主处理') && delivered[0].text.includes('只有提现不可做'), 'alert wake carries the closed-loop protocol and the single red line')
+assert.ok(delivered[0].text.includes('按盯盘闭环自主处理') && delivered[0].text.includes('自动开仓必须带止损'), 'alert wake carries the closed-loop protocol and the stop requirement')
 waker.notify(ev('c', 60_000))
 await run(65_000)
 assert.equal(delivered.length, 1, 'cooldown: no second wake within 5 minutes')

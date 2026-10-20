@@ -5,27 +5,27 @@ const BAR = 15 * 60_000
 let clock = BAR * 10 + 60_000
 let last = { t: BAR * 9, o: 100, h: 102, l: 99, c: 101, v: 1000 }
 const events = []
+let reads = 0
+const sessions = [{ sessionId: 'a', coin: 'BTC' }, { sessionId: 'b', coin: 'BTC' }, { sessionId: 'archived', coin: 'ETH', tradingEnabled: false }]
 const remote = {
-  cfg: { network: 'testnet', tradingMode: 'live', agentAutoTradeTestnet: true },
-  isManaged: () => true,
-  store: {
-    journal: () => ({ strategies: [{ id: 's1', status: 'testing', markets: 'ETH', timeframe: '15m' }] }),
-    listSessions: () => [{ sessionId: 'eth-session', coin: 'ETH' }],
-  },
-  candles: async () => ({ candles: [last] }),
+  cfg: { network: 'testnet', tradingMode: 'live', agentAutoTradeTestnet: true }, isManaged: () => true,
+  store: { journal: (sessionId) => ({ strategies: sessionId === 'a' ? [{ id: 'only-a', status: 'testing', markets: 'BTC' }] : [] }), listSessions: () => sessions },
+  candles: async () => { reads++; return { candles: [last] } },
 }
 const monitor = createStrategyBarMonitor(remote, { now: () => clock, notify: (event) => { events.push(event); return true } })
-assert.deepEqual(await monitor.check(), [], 'first read establishes a baseline')
+assert.equal((await monitor.check()).length, 2, 'first check wakes each enabled session, even without a strategy')
+assert.equal(reads, 1, 'one market read serves both BTC sessions')
+assert.deepEqual(events.map((event) => event.strategyIds), [['only-a'], []])
+assert.equal(new Set(events.map((event) => event.id)).size, 2, 'wake dedupe includes session')
+assert.deepEqual(await monitor.check(), [])
 clock = BAR * 11 + 6_000
-last = { t: BAR * 10, o: 101, h: 105, l: 100, c: 104, v: 2000 }
-assert.equal((await monitor.check()).length, 1, 'newly closed 15m bar wakes the agent')
-assert.equal(events[0].sessionId, 'eth-session')
-assert.equal(events[0].strategyIds[0], 's1')
-assert.deepEqual(await monitor.check(), [], 'same bar never wakes twice')
+last = { ...last, t: BAR * 10 }
+assert.equal((await monitor.check()).length, 2, 'both same-coin strategies get every closed bar')
 remote.cfg.network = 'mainnet'
-clock = BAR * 12 + 6_000
-last = { t: BAR * 11, o: 104, h: 106, l: 102, c: 103, v: 1300 }
-assert.deepEqual(await monitor.check(), [], 'mainnet automatic decision turns stay disabled')
-assert.equal(events.length, 1)
+assert.equal((await monitor.check()).length, 2, 'mainnet gets its own initial check')
+clock = BAR * 12 + 6_000; last = { ...last, t: BAR * 11 }
+assert.equal((await monitor.check()).length, 2, 'mainnet continues after the first check')
+sessions.push({ sessionId: 'new', coin: 'BTC' })
+assert.equal((await monitor.check()).length, 1, 'new sessions enter monitoring before the next bar')
 monitor.dispose()
-console.log('strategy monitor: fresh closed bar, dedupe, session route and testnet gate passed')
+console.log('盯盘：逐会话路由、同币取数复用、首次入场检查、暂停排除与主网连续唤醒通过')
