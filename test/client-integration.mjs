@@ -82,7 +82,7 @@ vm.runInContext(code, sandbox, { filename: 'client.js' })
 // ── 1) plugin object shape ──────────────────────────────────────────────
 check('产物产出插件对象', plugin !== null && typeof plugin.apply === 'function')
 check('inject 声明完整', JSON.stringify(plugin?.inject) === JSON.stringify(
-  ['connection', 'slots', 'locale', 'theme', 'layout', 'sessions', 'workspaces', 'uiConversation', 'uiWorkspace'],
+  ['connection', 'slots', 'locale', 'theme', 'layout', 'sessions', 'workspaces', 'uiConversation', 'uiWorkspace', 'sidebarRight'],
 ), plugin?.inject)
 
 // ── 2) apply registers slots + styles ──────────────────────────────────
@@ -105,6 +105,7 @@ const ctx = {
       layout: { selectPanel() {} },
       sessions: sessionsSvc,
       uiConversation: {},
+      sidebarRight: { openResource() {} },
       uiWorkspace: { openSession() {} },
     }[name] ?? null
   },

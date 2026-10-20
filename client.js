@@ -48,7 +48,7 @@ __export(index_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
-var React34 = __toESM(require("react"), 1);
+var React35 = __toESM(require("react"), 1);
 
 // src/client/styles.css
 var styles_default = `/**
@@ -621,6 +621,18 @@ body:has(.dhl-divider.dragging) * { cursor: col-resize !important; }
 .dhl-risk-form label.dhl-risk-wide, .dhl-risk-budget, .dhl-risk-error { grid-column: 1 / -1; }
 .dhl-risk-budget { margin: 2px 0 0; color: var(--dsw-alias-label-secondary); font-size: 13px; }
 .dhl-risk-error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 13px; }
+
+/* Desk file preview: the fallback when the shipped sidebar cannot open a file link. */
+.dhl-file-modal { width: min(820px, calc(100vw - 48px)); max-height: min(84vh, 920px); }
+.dhl-file-content { max-height: min(68vh, 760px); }
+.dhl-file-note { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 1.6; }
+.dhl-file-note.dhl-file-error { color: var(--dsw-alias-state-error-primary); }
+.dhl-file-text { margin: 0; padding: 10px 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md, 8px); background: var(--dsw-alias-bg-layer-1); overflow: auto; font: 12px/1.6 var(--dsw-font-family-mono, ui-monospace, Menlo, monospace); }
+.dhl-file-line { display: flex; gap: 12px; padding: 0 12px; }
+.dhl-file-line-active { background: var(--dsw-alias-interactive-bg-hover); }
+.dhl-file-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); opacity: .7; user-select: none; font-variant-numeric: tabular-nums; }
+.dhl-file-code { flex: 1; min-width: 0; white-space: pre; color: var(--dsw-alias-label-primary); }
+.dhl-file-meta { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 11.5px; }
 
 /* hyper_* tool rows and the approval order card (rendered inside DSH's conversation). */
 .dhl-tool-verdict { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); font-size: var(--dsh-content-font-size-secondary, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1247,15 +1259,15 @@ var DICT = {
 // src/client/store.ts
 var import_react = require("react");
 function createStore(initial) {
-  let state = initial;
+  let state2 = initial;
   const subs = /* @__PURE__ */ new Set();
   return {
-    get: () => state,
+    get: () => state2,
     patch(p) {
-      const partial = typeof p === "function" ? p(state) : p;
-      const next = { ...state, ...partial };
-      if (next !== state) {
-        state = next;
+      const partial = typeof p === "function" ? p(state2) : p;
+      const next = { ...state2, ...partial };
+      if (next !== state2) {
+        state2 = next;
         subs.forEach((f) => {
           try {
             f();
@@ -1410,8 +1422,8 @@ try {
 }
 
 // src/client/app.tsx
-var React32 = __toESM(require("react"), 1);
-var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
+var React33 = __toESM(require("react"), 1);
+var import_dsh_client_ui_primitives11 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // lib/studies.js
 var DEFAULT_INDICATOR_SETTINGS = {
@@ -1874,10 +1886,10 @@ async function openSession(sessionId, fallbackCoin = "BTC") {
   }
 }
 function saveSessionWorkspace(patch) {
-  const state = store.get();
-  const sessionId = state.activeSessionId;
-  if (sessionId && (state.workspaceSessionId !== sessionId || !state.workspace)) return;
-  const current2 = state.workspace ?? ANONYMOUS_WORKSPACE;
+  const state2 = store.get();
+  const sessionId = state2.activeSessionId;
+  if (sessionId && (state2.workspaceSessionId !== sessionId || !state2.workspace)) return;
+  const current2 = state2.workspace ?? ANONYMOUS_WORKSPACE;
   const next = {
     ...current2,
     ...patch,
@@ -2194,9 +2206,9 @@ async function reloadMaLines(sessionId) {
   const version = ++maReloadVersion;
   try {
     const workspace = await hyperCall("sessionWorkspace", { sessionId });
-    const state = store.get();
+    const state2 = store.get();
     if (version !== maReloadVersion) return;
-    if (state.workspaceSessionId === sessionId && state.workspace) store.patch({ workspace: { ...state.workspace, maLines: workspace.maLines ?? [] } });
+    if (state2.workspaceSessionId === sessionId && state2.workspace) store.patch({ workspace: { ...state2.workspace, maLines: workspace.maLines ?? [] } });
   } catch {
   }
 }
@@ -2205,10 +2217,10 @@ async function reloadChartView(sessionId) {
   const version = ++viewReloadVersion;
   try {
     const workspace = await hyperCall("sessionWorkspace", { sessionId });
-    const state = store.get();
-    if (version !== viewReloadVersion || state.workspaceSessionId !== sessionId || !state.workspace) return;
-    const intervalChanged = workspace.interval !== state.interval;
-    store.patch({ workspace: { ...state.workspace, interval: workspace.interval, indicators: workspace.indicators }, interval: workspace.interval });
+    const state2 = store.get();
+    if (version !== viewReloadVersion || state2.workspaceSessionId !== sessionId || !state2.workspace) return;
+    const intervalChanged = workspace.interval !== state2.interval;
+    store.patch({ workspace: { ...state2.workspace, interval: workspace.interval, indicators: workspace.indicators }, interval: workspace.interval });
     if (intervalChanged) void loadCandles();
   } catch {
   }
@@ -2412,24 +2424,24 @@ function saveLayout(s, sessionId = null) {
   }
 }
 function useLayout(sessionId = null, remoteLayout = null, onCommit) {
-  const [state, setState] = React.useState(() => {
+  const [state2, setState2] = React.useState(() => {
     current = loadLayout(sessionId);
     return { ...current };
   });
   React.useEffect(() => {
     current = remoteLayout ? { ...remoteLayout } : loadLayout(sessionId);
-    setState(current);
+    setState2(current);
   }, [sessionId, remoteLayout]);
   const set = React.useCallback((p) => {
     const partial = typeof p === "function" ? p(current) : p;
     current = { ...current, ...partial };
-    setState(current);
+    setState2(current);
   }, []);
   const commit = React.useCallback(() => {
     saveLayout(current, sessionId);
     if (sessionId) onCommit?.(current);
   }, [sessionId, onCommit]);
-  return [state, set, commit];
+  return [state2, set, commit];
 }
 
 // src/client/components/brand-mark.tsx
@@ -12036,7 +12048,7 @@ function sourceTopPaneViews$1(source, pane) {
   return source._internal_topPaneViews?.(pane) ?? [];
 }
 var PaneWidget = class _PaneWidget {
-  constructor(chart, state) {
+  constructor(chart, state2) {
     this._private__size = size({ width: 0, height: 0 });
     this._private__leftPriceAxisWidget = null;
     this._private__rightPriceAxisWidget = null;
@@ -12065,7 +12077,7 @@ var PaneWidget = class _PaneWidget {
       this._private__model()._internal_lightUpdate();
     };
     this._private__chart = chart;
-    this._private__state = state;
+    this._private__state = state2;
     this._private__state._internal_onDestroyed()._internal_subscribe(this._private__onStateDestroyed.bind(this), this, true);
     this._private__paneCell = document.createElement("td");
     this._private__paneCell.style.padding = "0";
@@ -12309,11 +12321,11 @@ var PaneWidget = class _PaneWidget {
     this._private__endScroll(event);
   }
   _internal_hitTest(x, y) {
-    const state = this._private__state;
-    if (state === null) {
+    const state2 = this._private__state;
+    if (state2 === null) {
       return null;
     }
-    return hitTestPane(state, x, y);
+    return hitTestPane(state2, x, y);
   }
   _internal_setPriceAxisSize(width, position) {
     const priceAxisWidget = position === "left" ? this._private__leftPriceAxisWidget : this._private__rightPriceAxisWidget;
@@ -12448,9 +12460,9 @@ var PaneWidget = class _PaneWidget {
     }
   }
   _private__drawGrid(target) {
-    const state = ensureNotNull(this._private__state);
-    const paneView = state._internal_grid()._internal_paneView();
-    const renderer = paneView._internal_renderer(state);
+    const state2 = ensureNotNull(this._private__state);
+    const paneView = state2._internal_grid()._internal_paneView();
+    const renderer = paneView._internal_renderer(state2);
     if (renderer !== null) {
       renderer._internal_draw(target, false);
     }
@@ -12459,17 +12471,17 @@ var PaneWidget = class _PaneWidget {
     this._private__drawSourceImpl(target, sourcePaneViews$1, drawForeground, this._private__model()._internal_crosshairSource());
   }
   _private__drawSources(target, paneViewsGetter) {
-    const state = ensureNotNull(this._private__state);
+    const state2 = ensureNotNull(this._private__state);
     const hoveredSplitSource = paneViewsGetter === sourcePaneViews$1 ? this._private__hoveredSplitSource() : null;
-    const hoveredSplitViews = hoveredSplitSource === null ? null : this._private__hoveredSplitSourcePaneViews(hoveredSplitSource, state);
-    const panePrimitives = state._internal_primitives();
+    const hoveredSplitViews = hoveredSplitSource === null ? null : this._private__hoveredSplitSourcePaneViews(hoveredSplitSource, state2);
+    const panePrimitives = state2._internal_primitives();
     if (hoveredSplitViews === null || hoveredSplitSource === null) {
-      const sources2 = state._internal_orderedSourcesForRendering();
+      const sources2 = state2._internal_orderedSourcesForRendering();
       this._private__drawSourceGroup(target, paneViewsGetter, drawBackground, panePrimitives, sources2);
       this._private__drawSourceGroup(target, paneViewsGetter, drawForeground, panePrimitives, sources2);
       return;
     }
-    const sources = state._internal_orderedSources();
+    const sources = state2._internal_orderedSources();
     const sourcePaneViewsOverride = (source) => source === hoveredSplitSource ? hoveredSplitViews._internal_normalPaneViews : void 0;
     this._private__drawSourceGroup(target, paneViewsGetter, drawBackground, panePrimitives, sources, sourcePaneViewsOverride);
     this._private__drawSourceGroup(target, paneViewsGetter, drawForeground, panePrimitives, sources, sourcePaneViewsOverride);
@@ -12491,12 +12503,12 @@ var PaneWidget = class _PaneWidget {
     }
   }
   _private__hoveredSplitSource() {
-    const state = ensureNotNull(this._private__state);
-    const hoveredSource = state._internal_model()._internal_hoveredSource()?._internal_source;
-    if (!state._internal_model()._internal_options().hoveredSeriesOnTop || hoveredSource === void 0) {
+    const state2 = ensureNotNull(this._private__state);
+    const hoveredSource = state2._internal_model()._internal_hoveredSource()?._internal_source;
+    if (!state2._internal_model()._internal_options().hoveredSeriesOnTop || hoveredSource === void 0) {
       return null;
     }
-    for (const source of state._internal_orderedSources()) {
+    for (const source of state2._internal_orderedSources()) {
       if (source === hoveredSource) {
         return source;
       }
@@ -12511,15 +12523,15 @@ var PaneWidget = class _PaneWidget {
     return hoveredPaneViews;
   }
   _private__drawSourceImpl(target, paneViewsGetter, drawFn, source, paneViewsOverride) {
-    const state = ensureNotNull(this._private__state);
-    const hoveredSource = state._internal_model()._internal_hoveredSource();
+    const state2 = ensureNotNull(this._private__state);
+    const hoveredSource = state2._internal_model()._internal_hoveredSource();
     const isHovered = hoveredSource !== null && hoveredSource._internal_source === source;
     const objecId = hoveredSource !== null && isHovered && hoveredSource._internal_object !== void 0 ? hoveredSource._internal_object._internal_hitTestData : void 0;
     const drawRendererFn = (renderer) => drawFn(renderer, target, isHovered, objecId);
     if (paneViewsOverride === void 0) {
-      drawSourceViews(paneViewsGetter, drawRendererFn, source, state);
+      drawSourceViews(paneViewsGetter, drawRendererFn, source, state2);
     } else {
-      drawPaneViews(paneViewsOverride, drawRendererFn, state);
+      drawPaneViews(paneViewsOverride, drawRendererFn, state2);
     }
   }
   _private__recreatePriceAxisWidgets() {
@@ -12581,8 +12593,8 @@ var PaneWidget = class _PaneWidget {
       return;
     }
     const model = this._private__model();
-    const state = this._internal_state();
-    model._internal_endScrollPrice(state, state._internal_defaultPriceScale());
+    const state2 = this._internal_state();
+    model._internal_endScrollPrice(state2, state2._internal_defaultPriceScale());
     this._private__startScrollingPos = null;
     this._private__isScrolling = false;
     model._internal_endScrollTime();
@@ -13685,10 +13697,10 @@ var ChartWidget = class {
       this._private__tableElement.insertBefore(paneWidget._internal_getElement(), this._private__timeAxisWidget._internal_getElement());
     }
     for (let i = 0; i < targetPaneWidgetsCount; i++) {
-      const state = panes[i];
+      const state2 = panes[i];
       const paneWidget = this._private__paneWidgets[i];
-      if (paneWidget._internal_state() !== state) {
-        paneWidget._internal_setState(state);
+      if (paneWidget._internal_state() !== state2) {
+        paneWidget._internal_setState(state2);
       } else {
         paneWidget._internal_updatePriceAxisWidgetsStates();
       }
@@ -21306,8 +21318,8 @@ function iconNames(market) {
 function MarketIcon({ market, small = false }) {
   const names = iconNames(market);
   const identity = `${market.kind}:${market.name}:${names.join(",")}`;
-  const [state, setState] = React20.useState({ identity, index: 0, loaded: false });
-  const current2 = state.identity === identity ? state : { identity, index: 0, loaded: false };
+  const [state2, setState2] = React20.useState({ identity, index: 0, loaded: false });
+  const current2 = state2.identity === identity ? state2 : { identity, index: 0, loaded: false };
   const name = names[current2.index];
   return /* @__PURE__ */ React20.createElement("span", { className: "dhl-market-icon" + (small ? " dhl-market-icon-small" : ""), "aria-hidden": "true" }, name ? /* @__PURE__ */ React20.createElement(
     "img",
@@ -21317,8 +21329,8 @@ function MarketIcon({ market, small = false }) {
       alt: "",
       loading: small ? "lazy" : "eager",
       className: current2.loaded ? "loaded" : "",
-      onLoad: () => setState({ identity, index: current2.index, loaded: true }),
-      onError: () => setState({ identity, index: current2.index + 1, loaded: false })
+      onLoad: () => setState2({ identity, index: current2.index, loaded: true }),
+      onError: () => setState2({ identity, index: current2.index + 1, loaded: false })
     }
   ) : null);
 }
@@ -21853,27 +21865,27 @@ var durations = [6e4, 18e4, 3e5, 9e5, 18e5, 36e5, 72e5, 144e5, 288e5, 432e5, 864
 var merge2 = (a, b) => [...new Map([...a, ...b].filter((c) => Number.isFinite(c.t) && [c.o, c.h, c.l, c.c, c.v].every(Number.isFinite)).map((c) => [c.t, c])).values()].sort((a2, b2) => a2.t - b2.t).slice(-5e3);
 function ResearchPane({ coin, interval, onInterval, indicators, marks, link, chartType, onAnalyzeFill }) {
   const s = useStore(), scope = `${s.activeSessionId}:${s.status?.network}:${coin}:${interval}`;
-  const [state, setState] = React24.useState({ scope: "", candles: [], error: "", older: "idle", at: 0 });
+  const [state2, setState2] = React24.useState({ scope: "", candles: [], error: "", older: "idle", at: 0 });
   const currentScope = React24.useRef(scope);
   currentScope.current = scope;
-  const feed2 = state.scope === scope ? state : { scope, candles: [], error: "", older: "idle", at: 0 };
+  const feed2 = state2.scope === scope ? state2 : { scope, candles: [], error: "", older: "idle", at: 0 };
   React24.useEffect(() => {
     let alive = true, busy = false;
-    setState({ scope, candles: [], error: "", older: "idle", at: 0 });
-    const load = async () => {
+    setState2({ scope, candles: [], error: "", older: "idle", at: 0 });
+    const load2 = async () => {
       if (busy || document.hidden) return;
       busy = true;
       try {
         const result = await hyperCall("candles", { coin, interval });
-        if (alive) setState((old) => ({ ...old, scope, candles: merge2(old.scope === scope ? old.candles : [], result.candles), error: "", at: Date.now() }));
+        if (alive) setState2((old) => ({ ...old, scope, candles: merge2(old.scope === scope ? old.candles : [], result.candles), error: "", at: Date.now() }));
       } catch (cause) {
-        if (alive) setState((old) => ({ ...old, scope, error: String(cause?.message ?? cause) }));
+        if (alive) setState2((old) => ({ ...old, scope, error: String(cause?.message ?? cause) }));
       } finally {
         busy = false;
       }
     };
-    void load();
-    const timer = setInterval(() => void load(), 12e3);
+    void load2();
+    const timer = setInterval(() => void load2(), 12e3);
     return () => {
       alive = false;
       clearInterval(timer);
@@ -21883,16 +21895,16 @@ function ResearchPane({ coin, interval, onInterval, indicators, marks, link, cha
   const needOlder = async () => {
     if (olderBusy.current || feed2.older !== "idle" || !feed2.candles.length) return;
     olderBusy.current = true;
-    setState((old) => ({ ...old, older: "loading" }));
+    setState2((old) => ({ ...old, older: "loading" }));
     try {
       const first = feed2.candles[0].t;
       const result = await hyperCall("candles", { coin, interval, endMs: first - 1, startMs: first - durations[RESEARCH_INTERVALS.indexOf(interval)] * 500 });
-      if (currentScope.current === scope) setState((old) => {
+      if (currentScope.current === scope) setState2((old) => {
         const rows = merge2(result.candles, old.candles);
         return { ...old, candles: rows, older: !rows.length || rows[0].t >= first || rows.length >= 5e3 ? "done" : "idle" };
       });
     } catch (cause) {
-      if (currentScope.current === scope) setState((old) => ({ ...old, older: "error", error: String(cause?.message ?? cause) }));
+      if (currentScope.current === scope) setState2((old) => ({ ...old, older: "error", error: String(cause?.message ?? cause) }));
     } finally {
       olderBusy.current = false;
     }
@@ -21939,7 +21951,7 @@ function ResearchPane({ coin, interval, onInterval, indicators, marks, link, cha
       selectRequest: null,
       focus: null
     }
-  ), feed2.error ? /* @__PURE__ */ React24.createElement("button", { type: "button", className: "dhl-inline-error", onClick: () => setState((old) => ({ ...old, older: "idle" })) }, feed2.error, " \xB7 ", tr("\u81EA\u52A8\u91CD\u8BD5\u4E2D\uFF1B\u70B9\u51FB\u91CD\u8BD5\u5386\u53F2", "Retrying; click to retry history")) : null);
+  ), feed2.error ? /* @__PURE__ */ React24.createElement("button", { type: "button", className: "dhl-inline-error", onClick: () => setState2((old) => ({ ...old, older: "idle" })) }, feed2.error, " \xB7 ", tr("\u81EA\u52A8\u91CD\u8BD5\u4E2D\uFF1B\u70B9\u51FB\u91CD\u8BD5\u5386\u53F2", "Retrying; click to retry history")) : null);
 }
 
 // lib/workspace-settings.js
@@ -22186,9 +22198,9 @@ function DeskColumn({ onCollapse }) {
     void save(mark2, mark2.kind === "level" ? drawingLabel("level", [], mark2.price) : mark2.kind === "trend" ? drawingLabel("trend", [{ time: mark2.fromTime, price: mark2.fromPrice }]) : drawingLabel(mark2.kind, mark2.points));
   }, [save]);
   const analyzeFill = React26.useCallback((event) => {
-    const state = store.get();
-    const known = (id) => Boolean(id && state.sessions.some((row2) => row2.sessionId === id) && !state.archivedSessionIds.includes(id));
-    const target = known(event.sessionId) ? event.sessionId : state.activeSessionId;
+    const state2 = store.get();
+    const known = (id) => Boolean(id && state2.sessions.some((row2) => row2.sessionId === id) && !state2.archivedSessionIds.includes(id));
+    const target = known(event.sessionId) ? event.sessionId : state2.activeSessionId;
     if (!target) {
       notify(tr("\u8BF7\u5148\u9009\u62E9\u4EA4\u6613\u4F1A\u8BDD", "Choose a trading session first"));
       return;
@@ -22196,7 +22208,7 @@ function DeskColumn({ onCollapse }) {
     const side2 = event.isBuy ? tr("\u4E70\u5165", "Buy") : tr("\u5356\u51FA", "Sell");
     const when = new Date(event.time).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
     const text = [
-      tr(`\u3010\u6210\u4EA4\u590D\u76D8\u3011${event.coin} ${side2} ${event.sz} @ ${event.px}\uFF08${when}\uFF0C\u56FE\u8868\u5468\u671F ${state.interval}\uFF09`, `[Fill review] ${event.coin} ${side2} ${event.sz} @ ${event.px} (${when}, chart ${state.interval})`),
+      tr(`\u3010\u6210\u4EA4\u590D\u76D8\u3011${event.coin} ${side2} ${event.sz} @ ${event.px}\uFF08${when}\uFF0C\u56FE\u8868\u5468\u671F ${state2.interval}\uFF09`, `[Fill review] ${event.coin} ${side2} ${event.sz} @ ${event.px} (${when}, chart ${state2.interval})`),
       event.reason ? tr(`\u5F53\u65F6\u7684\u51B3\u7B56\u539F\u56E0\uFF1A${event.reason}`, `Rationale at the time: ${event.reason}`) : tr("\u8FD9\u7B14\u6210\u4EA4\u6CA1\u6709\u8BB0\u5F55\u51B3\u7B56\u539F\u56E0\u3002", "No rationale was recorded for this fill."),
       tr("\u8BF7\u7ED3\u5408\u6210\u4EA4\u4E4B\u540E\u7684\u8D70\u52BF\u590D\u76D8\uFF1A\u4F9D\u636E\u662F\u5426\u4ECD\u7136\u6210\u7ACB\u3001\u6267\u884C\u662F\u5426\u5230\u4F4D\u3001\u63A5\u4E0B\u6765\u5982\u4F55\u7BA1\u7406\u8FD9\u7B14\u4ED3\u4F4D\u3002", "Review it against what happened since: does the thesis still hold, was execution sound, and how should the position be managed now?")
     ].join("\n");
@@ -22206,10 +22218,10 @@ function DeskColumn({ onCollapse }) {
       text,
       label: `${tr("\u6210\u4EA4", "Fill")} ${side2} ${event.sz} ${event.coin} @ ${fmtPrice(event.px)}`,
       coin: event.coin,
-      interval: state.interval,
+      interval: state2.interval,
       t: event.candleTime
     }] }));
-    if (target !== state.activeSessionId) {
+    if (target !== state2.activeSessionId) {
       void openSession(target, event.coin);
       notify(tr("\u5DF2\u5207\u6362\u5230\u505A\u51FA\u8FD9\u7B14\u51B3\u7B56\u7684\u4F1A\u8BDD\uFF0C\u590D\u76D8\u5F15\u7528\u5DF2\u653E\u5165\u8F93\u5165\u6846", "Switched to the session that made this decision; the review is in the composer"));
     }
@@ -23189,19 +23201,159 @@ function TradingLimits({ open, onClose }) {
   ))), wallet.signer === "web3" && !web3Accounts.available ? /* @__PURE__ */ React31.createElement("p", { className: "dhl-limits-note" }, tr("\u6CA1\u6709\u68C0\u6D4B\u5230 dsh-web3 \u94B1\u5305\u63D2\u4EF6\u3002", "The dsh-web3 wallet plugin is not available.")) : null, /* @__PURE__ */ React31.createElement("p", { className: "dhl-limits-note" }, tr("\u4FDD\u5B58\u540E\u7ACB\u5373\u751F\u6548\uFF0C\u65E0\u9700\u91CD\u542F\uFF1B\u79C1\u94A5\u4ECD\u53EA\u5728\u63D2\u4EF6\u914D\u7F6E\u91CC\u7BA1\u7406\u3002\u65B0\u5EFA\u7684 dsh-web3 \u8D26\u6237\u82E5\u4E0D\u5728\u5217\u8868\u4E2D\uFF0C\u9700\u91CD\u542F DSH \u5237\u65B0\u94B1\u5305\u3002", "Applies immediately, no restart; the private key stays in plugin config. A dsh-web3 account created elsewhere may need a DSH restart to appear.")), /* @__PURE__ */ React31.createElement("dl", { className: "dhl-limits-facts" }, /* @__PURE__ */ React31.createElement("dt", null, tr("\u5F53\u524D", "Current")), /* @__PURE__ */ React31.createElement("dd", null, paper ? tr("\u6A21\u62DF\u76D8\u672C\u5730\u64AE\u5408\uFF0C\u4E0D\u7B7E\u540D\u3002", "Paper fills locally without signing.") : st?.signer === "web3" ? tr("dsh-web3 \u94B1\u5305\uFF0C\u6309\u5176\u7B7E\u540D\u7B56\u7565\u5904\u7406\uFF08DSH \u8BBE\u7F6E \u2192 Web3 \u94B1\u5305\uFF09\u3002", "dsh-web3 wallet, under its signing policy (DSH Settings \u2192 Web3 wallet).") : tr("\u63D2\u4EF6\u914D\u7F6E\u4E2D\u7684\u79C1\u94A5\uFF08DSH \u63D2\u4EF6\u914D\u7F6E\uFF09\u3002", "Private key from plugin configuration.")), /* @__PURE__ */ React31.createElement("dt", null, tr("\u6258\u7BA1\u6A21\u5F0F", "Custody")), /* @__PURE__ */ React31.createElement("dd", null, st?.custody === "managed" ? tr("\u5168\u6258\u7BA1\uFF1Aagent \u5728\u9650\u989D\u5185\u76F4\u63A5\u6267\u884C\uFF0C\u4E5F\u53EF\u8C03\u6574\u8FD9\u4E9B\u9650\u989D\u5E76\u5212\u8F6C HIP-3 \u4FDD\u8BC1\u91D1\uFF0C\u6BCF\u6B21\u90FD\u4F1A\u5728\u4F1A\u8BDD\u91CC\u8BF4\u660E\u3002", "Managed: the agent trades within limits, may adjust them and move HIP-3 margin, and says so each time.") : tr("\u534A\u6258\u7BA1\uFF1Aagent \u6BCF\u7B14\u5B9E\u76D8\u4E0B\u5355\u3001\u6539\u6760\u6746\u548C\u5212\u8F6C\u90FD\u9700\u8981\u4F60\u6279\u51C6\uFF0C\u9650\u989D\u53EA\u7531\u4F60\u4FEE\u6539\u3002", "Assisted: you approve each live order, leverage change and transfer; only you change limits."), /* @__PURE__ */ React31.createElement("span", { className: "dhl-limits-hint" }, tr("\u5728\u53F3\u4E0A\u89D2 \u8BBE\u7F6E \u2192 \u6258\u7BA1\u6A21\u5F0F \u5207\u6362\u3002", "Switch in Settings \u2192 Custody."))))) : null, error ? /* @__PURE__ */ React31.createElement("p", { className: "dhl-risk-error", role: "alert" }, error) : null));
 }
 
+// src/client/components/file-preview-modal.tsx
+var React32 = __toESM(require("react"), 1);
+var import_dsh_client_ui_primitives10 = require("@deepseek-ai/dsh-client-ui-primitives");
+
+// src/client/file-preview.ts
+var import_react2 = require("react");
+var listeners = /* @__PURE__ */ new Set();
+var INITIAL = { open: false, target: null, status: "loading", text: "", offset: 1, lines: 0, eof: true, error: null };
+var state = INITIAL;
+var requestToken = 0;
+function setState(next) {
+  state = next;
+  for (const fn of listeners) fn();
+}
+function subscribeFilePreview(fn) {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+function getFilePreview() {
+  return state;
+}
+function useFilePreview() {
+  return (0, import_react2.useSyncExternalStore)(subscribeFilePreview, getFilePreview, getFilePreview);
+}
+function closeFilePreview() {
+  requestToken += 1;
+  setState({ ...state, open: false, target: null });
+}
+var FILE_ADDRESS_PREFIX = "dsh-resource://file/";
+function parseFileAddress(address) {
+  if (typeof address !== "string" || !address.startsWith(FILE_ADDRESS_PREFIX)) return void 0;
+  const end = address.search(/[?#]/);
+  const rest = address.slice(FILE_ADDRESS_PREFIX.length, end === -1 ? void 0 : end);
+  const [scope, ...parts] = rest.split("/");
+  if (scope !== "session") return void 0;
+  const [id, ...segments] = parts;
+  if (id === void 0 || id === "" || segments.length === 0) return void 0;
+  try {
+    return { sessionId: decodeURIComponent(id), path: segments.map(decodeURIComponent).join("/") };
+  } catch {
+    return void 0;
+  }
+}
+async function load(target) {
+  const token = ++requestToken;
+  setState({ open: true, target, status: "loading", text: "", offset: 1, lines: 0, eof: true, error: null });
+  try {
+    const remote = getContext()?.remote;
+    const read = remote?.workspaceFiles?.read;
+    if (typeof read !== "function") throw new Error("workspaceFiles Remote unavailable");
+    const result = await read.call(remote.workspaceFiles, target.sessionId, target.path, { offset: 1, limit: 2e3 }, new AbortController().signal);
+    if (token !== requestToken) return;
+    if (!result?.ok) throw new Error(String(result?.error?.message ?? "read failed"));
+    const page = result.value;
+    setState({ ...state, status: "ready", text: page.text, offset: page.offset, lines: page.lines, eof: page.eof });
+  } catch (error) {
+    if (token !== requestToken) return;
+    setState({ ...state, status: "error", error: String(error?.message ?? error) });
+  }
+}
+function openFilePreview(target) {
+  void load(target);
+}
+function installFileOpenFallback(ctx) {
+  const service = ctx?.sidebarRight ?? ctx?.get?.("sidebarRight");
+  if (!service || typeof service.openResource !== "function") return () => {
+  };
+  if (service.__dhlFileFallback === true) return () => {
+  };
+  const original = service.openResource;
+  const patched = function(address, options) {
+    try {
+      return original.call(this, address, options);
+    } catch (error) {
+      const target = parseFileAddress(address);
+      if (target === void 0) throw error;
+      openFilePreview({ ...target, ...options?.params?.line === void 0 ? {} : { line: options.params.line } });
+      return void 0;
+    }
+  };
+  try {
+    service.openResource = patched;
+    service.__dhlFileFallback = true;
+  } catch {
+    return () => {
+    };
+  }
+  return () => {
+    if (service.openResource === patched) {
+      service.openResource = original;
+      service.__dhlFileFallback = false;
+    }
+  };
+}
+
+// src/client/components/file-preview-modal.tsx
+function FilePreviewModal() {
+  const s = useFilePreview();
+  const targetLineRef = React32.useRef(null);
+  const targetLine = s.target?.line;
+  React32.useEffect(() => {
+    if (s.status !== "ready" || targetLineRef.current === null) return;
+    targetLineRef.current.scrollIntoView({ block: "center" });
+  }, [s.status, targetLine]);
+  if (!s.open) return null;
+  const path = s.target?.path ?? "";
+  return /* @__PURE__ */ React32.createElement(
+    import_dsh_client_ui_primitives10.Modal,
+    {
+      open: true,
+      onClose: closeFilePreview,
+      title: path,
+      closeLabel: tr("\u5173\u95ED", "Close"),
+      className: "dhl-file-modal",
+      contentClassName: "dhl-file-content"
+    },
+    s.status === "loading" ? /* @__PURE__ */ React32.createElement("p", { className: "dhl-file-note" }, tr("\u6B63\u5728\u8BFB\u53D6\u6587\u4EF6\u2026", "Reading file\u2026")) : null,
+    s.status === "error" ? /* @__PURE__ */ React32.createElement("p", { className: "dhl-file-note dhl-file-error" }, s.error) : null,
+    s.status === "ready" ? /* @__PURE__ */ React32.createElement("pre", { className: "dhl-file-text" }, s.text.split("\n").map((line, index) => {
+      const number = index + 1;
+      const active = number === targetLine;
+      return /* @__PURE__ */ React32.createElement(
+        "span",
+        {
+          key: number,
+          ref: active ? (node) => {
+            targetLineRef.current = node;
+          } : void 0,
+          className: active ? "dhl-file-line dhl-file-line-active" : "dhl-file-line"
+        },
+        /* @__PURE__ */ React32.createElement("span", { className: "dhl-file-gutter" }, number),
+        /* @__PURE__ */ React32.createElement("span", { className: "dhl-file-code" }, line)
+      );
+    })) : null,
+    s.status === "ready" ? /* @__PURE__ */ React32.createElement("p", { className: "dhl-file-meta" }, tr(`\u5171 ${s.lines} \u884C`, `${s.lines} lines`), s.eof ? "" : tr("\uFF08\u5DF2\u622A\u65AD\uFF09", " (truncated)")) : null
+  );
+}
+
 // src/client/app.tsx
 function App(props) {
   const s = useStore();
   const st = s.status;
   const marketStale = isMarketStale(s);
-  const [confirmLive, setConfirmLive] = React32.useState(null);
-  const [networkBusy, setNetworkBusy] = React32.useState(false);
-  const [walletOpen, setWalletOpen] = React32.useState(false);
-  const [moreOpen, setMoreOpen] = React32.useState(false);
-  const [limitsOpen, setLimitsOpen] = React32.useState(false);
-  const [confirmManaged, setConfirmManaged] = React32.useState(false);
+  const [confirmLive, setConfirmLive] = React33.useState(null);
+  const [networkBusy, setNetworkBusy] = React33.useState(false);
+  const [walletOpen, setWalletOpen] = React33.useState(false);
+  const [moreOpen, setMoreOpen] = React33.useState(false);
+  const [limitsOpen, setLimitsOpen] = React33.useState(false);
+  const [confirmManaged, setConfirmManaged] = React33.useState(false);
   const custody = st?.custody === "managed" ? "managed" : "assisted";
-  const chooseCustody = React32.useCallback(async (next, acknowledge = false) => {
+  const chooseCustody = React33.useCallback(async (next, acknowledge = false) => {
     setMoreOpen(false);
     if (next === "managed" && store.get().status?.tradingMode === "live" && !acknowledge) {
       setConfirmManaged(true);
@@ -23215,10 +23367,10 @@ function App(props) {
       setConfirmManaged(false);
     }
   }, []);
-  const moreRef = React32.useRef(null);
+  const moreRef = React33.useRef(null);
   const network = st?.network === "testnet" ? "testnet" : "mainnet";
   const mode = st?.tradingMode === "paper" ? "paper" : "live";
-  const applyEnv = React32.useCallback(async (next) => {
+  const applyEnv = React33.useCallback(async (next) => {
     setNetworkBusy(true);
     try {
       const current2 = store.get().status;
@@ -23231,12 +23383,12 @@ function App(props) {
       setConfirmLive(null);
     }
   }, []);
-  const requestEnv = React32.useCallback((next) => {
+  const requestEnv = React33.useCallback((next) => {
     setMoreOpen(false);
     if (next.network === "mainnet" && next.mode === "live") setConfirmLive(next);
     else void applyEnv(next);
   }, [applyEnv]);
-  React32.useEffect(() => {
+  React33.useEffect(() => {
     if (!moreOpen) return void 0;
     const onDown = (event) => {
       if (!moreRef.current?.contains(event.target)) setMoreOpen(false);
@@ -23251,8 +23403,8 @@ function App(props) {
       window.removeEventListener("keydown", onKey);
     };
   }, [moreOpen]);
-  React32.useEffect(() => startPolling(), []);
-  React32.useEffect(() => {
+  React33.useEffect(() => startPolling(), []);
+  React33.useEffect(() => {
     const list = getContext()?.get("sessions")?.list;
     if (!list?.subscribe) return void 0;
     const read = () => {
@@ -23265,19 +23417,19 @@ function App(props) {
     read();
     return list.subscribe(read);
   }, []);
-  React32.useEffect(() => {
+  React33.useEffect(() => {
     const list = getContext()?.get("workspaces")?.list;
     if (!list?.subscribe) return void 0;
     const read = () => store.patch({ archivedSessionIds: [...list.getSnapshot()?.archivedSessionIds ?? []] });
     read();
     return list.subscribe(read);
   }, []);
-  React32.useEffect(() => {
+  React33.useEffect(() => {
     const locale = getContext()?.get("locale");
     if (!locale?.subscribe) return void 0;
     return locale.subscribe(() => store.patch((prev) => ({ localeRevision: prev.localeRevision + 1 })));
   }, []);
-  React32.useEffect(() => {
+  React33.useEffect(() => {
     if (!s.sessionsLoaded) return;
     const visible = s.sessions.filter((row) => !s.archivedSessionIds.includes(row.sessionId) && (!s.nativeSessionsReady || s.nativeSessionIds.includes(row.sessionId)));
     if (visible.some((row) => row.sessionId === s.activeSessionId)) return;
@@ -23287,60 +23439,61 @@ function App(props) {
   }, [s.sessions, s.sessionsLoaded, s.archivedSessionIds, s.nativeSessionIds, s.nativeSessionsReady, s.activeSessionId]);
   const wsState = s.snapshot?.ws?.state ?? st?.ws?.state;
   const resyncing = marketStale && !s.statusError && Date.now() - s.resumedAt < 1e4;
-  const wsBadge = wsState === "open" && !marketStale ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge ok", title: `WebSocket: ${wsState}` }, t("status.online", "\u5728\u7EBF")) : resyncing ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge", title: `WebSocket: ${wsState ?? "off"}` }, tr("\u540C\u6B65\u4E2D", "Syncing")) : /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge err", title: `WebSocket: ${wsState ?? "off"}` }, t("status.offline", "\u79BB\u7EBF"));
+  const wsBadge = wsState === "open" && !marketStale ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge ok", title: `WebSocket: ${wsState}` }, t("status.online", "\u5728\u7EBF")) : resyncing ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge", title: `WebSocket: ${wsState ?? "off"}` }, tr("\u540C\u6B65\u4E2D", "Syncing")) : /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge err", title: `WebSocket: ${wsState ?? "off"}` }, t("status.offline", "\u79BB\u7EBF"));
   const [layout, setLayout, commitLayout] = useLayout(
     s.activeSessionId,
     s.activeSessionId && s.workspaceSessionId === s.activeSessionId ? s.workspace?.layout : null,
     (next) => saveSessionWorkspace({ layout: next })
   );
-  const resizeSessions = React32.useCallback((delta) => {
+  const resizeSessions = React33.useCallback((delta) => {
     setLayout((prev) => ({ sessionsWidth: clampWidth(prev.sessionsWidth + delta, LIMITS.sessions) }));
   }, [setLayout]);
-  const resizeChat = React32.useCallback((delta) => {
+  const resizeChat = React33.useCallback((delta) => {
     setLayout((prev) => ({ chatWidth: clampWidth(prev.chatWidth + delta, LIMITS.chat) }));
   }, [setLayout]);
-  const resetSessions = React32.useCallback(() => {
+  const resetSessions = React33.useCallback(() => {
     setLayout({ sessionsWidth: DEFAULTS.sessionsWidth });
     commitLayout();
   }, [setLayout, commitLayout]);
-  const resetChat = React32.useCallback(() => {
+  const resetChat = React33.useCallback(() => {
     setLayout({ chatWidth: DEFAULTS.chatWidth });
     commitLayout();
   }, [setLayout, commitLayout]);
-  const toggleSessions = React32.useCallback(() => {
+  const toggleSessions = React33.useCallback(() => {
     setLayout((prev) => ({ sessionsCollapsed: !prev.sessionsCollapsed }));
     commitLayout();
   }, [setLayout, commitLayout]);
-  const toggleDesk = React32.useCallback(() => {
+  const toggleDesk = React33.useCallback(() => {
     setLayout((prev) => ({ deskCollapsed: !prev.deskCollapsed }));
     commitLayout();
   }, [setLayout, commitLayout]);
-  const toggleChat = React32.useCallback(() => {
+  const toggleChat = React33.useCallback(() => {
     setLayout((prev) => ({ chatCollapsed: !prev.chatCollapsed }));
     commitLayout();
   }, [setLayout, commitLayout]);
   const showSessions = !layout.sessionsCollapsed;
   const showDesk = !layout.deskCollapsed;
   const showChat = !layout.chatCollapsed;
-  return /* @__PURE__ */ React32.createElement("div", { className: "dhl-root" }, /* @__PURE__ */ React32.createElement("div", { className: "dhl-topbar" }, /* @__PURE__ */ React32.createElement("span", { className: "dhl-brand" }, /* @__PURE__ */ React32.createElement(BrandMark, null), "Hyperliquid ", /* @__PURE__ */ React32.createElement("span", { style: { fontWeight: 400, color: "var(--dsw-alias-label-secondary)" } }, t("app.suffix", "\u4EA4\u6613\u53F0"))), /* @__PURE__ */ React32.createElement("div", { className: "dhl-spacer" }), s.statusError ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge err" }, t("status.unavailable", "\u8FDC\u7AEF\u4E0D\u53EF\u7528")) : null, st && network === "testnet" ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge paper" }, t("network.testnet", "\u6D4B\u8BD5\u7F51")) : null, st && mode === "paper" ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge paper" }, t("mode.paper", "\u6A21\u62DF\u76D8")) : null, st && custody === "managed" ? /* @__PURE__ */ React32.createElement("span", { className: "dhl-badge managed", title: tr("\u5168\u6258\u7BA1\uFF1Aagent \u53EF\u81EA\u4E3B\u6267\u884C\u5B9E\u76D8\u3001\u8C03\u6574\u9650\u989D\u4E0E\u5212\u8F6C\u4FDD\u8BC1\u91D1", "Managed: the agent trades, adjusts limits and moves margin on its own") }, tr("\u5168\u6258\u7BA1", "Managed")) : null, wsBadge, /* @__PURE__ */ React32.createElement("button", { type: "button", className: "dhl-badge dhl-wallet-trigger", onClick: () => setWalletOpen(true), "aria-haspopup": "dialog", "aria-label": tr("\u67E5\u770B\u94B1\u5305\u8BE6\u60C5\u548C\u6536\u76CA", "View wallet and P&L") }, mode === "paper" ? tr("\u6A21\u62DF\u8D26\u6237", "Paper account") : st?.address ? st.address.slice(0, 6) + "\u2026" + st.address.slice(-4) : t("account.none", "\u672A\u8FDE\u63A5\u94B1\u5305"), /* @__PURE__ */ React32.createElement(UiIcon, { name: "chevronDown", size: 14 })), /* @__PURE__ */ React32.createElement("div", { className: "dhl-more", ref: moreRef }, /* @__PURE__ */ React32.createElement("button", { type: "button", className: "dhl-top-control dhl-more-trigger", "aria-haspopup": "menu", "aria-expanded": moreOpen, "aria-label": tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings"), title: tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings"), onClick: () => setMoreOpen((value) => !value) }, /* @__PURE__ */ React32.createElement(UiIcon, { name: "settings", size: 17 })), moreOpen ? /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-popover", role: "menu" }, /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React32.createElement("span", null, t("network.label", "\u7F51\u7EDC")), /* @__PURE__ */ React32.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React32.createElement("button", { type: "button", className: network === "mainnet" ? "on" : "", disabled: networkBusy || !st, onClick: () => network !== "mainnet" && requestEnv({ network: "mainnet", mode }) }, t("network.mainnet", "\u4E3B\u7F51")), /* @__PURE__ */ React32.createElement("button", { type: "button", className: network === "testnet" ? "on" : "", disabled: networkBusy || !st, onClick: () => network !== "testnet" && requestEnv({ network: "testnet", mode }) }, t("network.testnet", "\u6D4B\u8BD5\u7F51")))), /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React32.createElement("span", null, tr("\u8D26\u6237", "Account")), /* @__PURE__ */ React32.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React32.createElement("button", { type: "button", className: mode === "live" ? "on" : "", disabled: networkBusy || !st, onClick: () => mode !== "live" && requestEnv({ network, mode: "live" }) }, t("mode.live", "\u5B9E\u76D8")), /* @__PURE__ */ React32.createElement("button", { type: "button", className: mode === "paper" ? "on" : "", disabled: networkBusy || !st, onClick: () => mode !== "paper" && requestEnv({ network, mode: "paper" }) }, t("mode.paper", "\u6A21\u62DF\u76D8")))), /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React32.createElement("span", null, tr("\u6258\u7BA1\u6A21\u5F0F", "Custody")), /* @__PURE__ */ React32.createElement("div", { className: "dhl-segment", role: "group", "aria-label": tr("\u6258\u7BA1\u6A21\u5F0F", "Custody") }, /* @__PURE__ */ React32.createElement("button", { type: "button", className: custody === "assisted" ? "on" : "", "aria-pressed": custody === "assisted", disabled: !st, title: tr("\u5B9E\u76D8\u4E0B\u5355\u3001\u5212\u8F6C\u9700\u4F60\u6279\u51C6\uFF1B\u9650\u989D\u53EA\u7531\u4F60\u4FEE\u6539", "You approve live orders and transfers; only you change limits"), onClick: () => custody !== "assisted" && void chooseCustody("assisted") }, tr("\u534A\u6258\u7BA1", "Assisted")), /* @__PURE__ */ React32.createElement("button", { type: "button", className: custody === "managed" ? "on" : "", "aria-pressed": custody === "managed", disabled: !st, title: tr("agent \u81EA\u4E3B\u6267\u884C\u5B9E\u76D8\u3001\u8C03\u6574\u9650\u989D\u4E0E\u5212\u8F6C\u4FDD\u8BC1\u91D1", "The agent trades, adjusts limits and moves margin on its own"), onClick: () => custody !== "managed" && void chooseCustody("managed") }, tr("\u5168\u6258\u7BA1", "Managed")))), /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React32.createElement("span", null, tr("\u76D8\u53E3 / \u6210\u4EA4\u4F4D\u7F6E", "Book / trades position")), /* @__PURE__ */ React32.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React32.createElement("button", { type: "button", className: s.tapePlacement === "auto" ? "on" : "", onClick: () => setTapePlacement("auto") }, tr("\u81EA\u9002\u5E94", "Auto")), /* @__PURE__ */ React32.createElement("button", { type: "button", className: s.tapePlacement === "below" ? "on" : "", onClick: () => setTapePlacement("below") }, tr("\u56FE\u8868\u4E0B\u65B9", "Below chart")))), /* @__PURE__ */ React32.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React32.createElement("span", null, tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings")), /* @__PURE__ */ React32.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React32.createElement("button", { type: "button", onClick: () => {
+  return /* @__PURE__ */ React33.createElement("div", { className: "dhl-root" }, /* @__PURE__ */ React33.createElement("div", { className: "dhl-topbar" }, /* @__PURE__ */ React33.createElement("span", { className: "dhl-brand" }, /* @__PURE__ */ React33.createElement(BrandMark, null), "Hyperliquid ", /* @__PURE__ */ React33.createElement("span", { style: { fontWeight: 400, color: "var(--dsw-alias-label-secondary)" } }, t("app.suffix", "\u4EA4\u6613\u53F0"))), /* @__PURE__ */ React33.createElement("div", { className: "dhl-spacer" }), s.statusError ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge err" }, t("status.unavailable", "\u8FDC\u7AEF\u4E0D\u53EF\u7528")) : null, st && network === "testnet" ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge paper" }, t("network.testnet", "\u6D4B\u8BD5\u7F51")) : null, st && mode === "paper" ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge paper" }, t("mode.paper", "\u6A21\u62DF\u76D8")) : null, st && custody === "managed" ? /* @__PURE__ */ React33.createElement("span", { className: "dhl-badge managed", title: tr("\u5168\u6258\u7BA1\uFF1Aagent \u53EF\u81EA\u4E3B\u6267\u884C\u5B9E\u76D8\u3001\u8C03\u6574\u9650\u989D\u4E0E\u5212\u8F6C\u4FDD\u8BC1\u91D1", "Managed: the agent trades, adjusts limits and moves margin on its own") }, tr("\u5168\u6258\u7BA1", "Managed")) : null, wsBadge, /* @__PURE__ */ React33.createElement("button", { type: "button", className: "dhl-badge dhl-wallet-trigger", onClick: () => setWalletOpen(true), "aria-haspopup": "dialog", "aria-label": tr("\u67E5\u770B\u94B1\u5305\u8BE6\u60C5\u548C\u6536\u76CA", "View wallet and P&L") }, mode === "paper" ? tr("\u6A21\u62DF\u8D26\u6237", "Paper account") : st?.address ? st.address.slice(0, 6) + "\u2026" + st.address.slice(-4) : t("account.none", "\u672A\u8FDE\u63A5\u94B1\u5305"), /* @__PURE__ */ React33.createElement(UiIcon, { name: "chevronDown", size: 14 })), /* @__PURE__ */ React33.createElement("div", { className: "dhl-more", ref: moreRef }, /* @__PURE__ */ React33.createElement("button", { type: "button", className: "dhl-top-control dhl-more-trigger", "aria-haspopup": "menu", "aria-expanded": moreOpen, "aria-label": tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings"), title: tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings"), onClick: () => setMoreOpen((value) => !value) }, /* @__PURE__ */ React33.createElement(UiIcon, { name: "settings", size: 17 })), moreOpen ? /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-popover", role: "menu" }, /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React33.createElement("span", null, t("network.label", "\u7F51\u7EDC")), /* @__PURE__ */ React33.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React33.createElement("button", { type: "button", className: network === "mainnet" ? "on" : "", disabled: networkBusy || !st, onClick: () => network !== "mainnet" && requestEnv({ network: "mainnet", mode }) }, t("network.mainnet", "\u4E3B\u7F51")), /* @__PURE__ */ React33.createElement("button", { type: "button", className: network === "testnet" ? "on" : "", disabled: networkBusy || !st, onClick: () => network !== "testnet" && requestEnv({ network: "testnet", mode }) }, t("network.testnet", "\u6D4B\u8BD5\u7F51")))), /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React33.createElement("span", null, tr("\u8D26\u6237", "Account")), /* @__PURE__ */ React33.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React33.createElement("button", { type: "button", className: mode === "live" ? "on" : "", disabled: networkBusy || !st, onClick: () => mode !== "live" && requestEnv({ network, mode: "live" }) }, t("mode.live", "\u5B9E\u76D8")), /* @__PURE__ */ React33.createElement("button", { type: "button", className: mode === "paper" ? "on" : "", disabled: networkBusy || !st, onClick: () => mode !== "paper" && requestEnv({ network, mode: "paper" }) }, t("mode.paper", "\u6A21\u62DF\u76D8")))), /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React33.createElement("span", null, tr("\u6258\u7BA1\u6A21\u5F0F", "Custody")), /* @__PURE__ */ React33.createElement("div", { className: "dhl-segment", role: "group", "aria-label": tr("\u6258\u7BA1\u6A21\u5F0F", "Custody") }, /* @__PURE__ */ React33.createElement("button", { type: "button", className: custody === "assisted" ? "on" : "", "aria-pressed": custody === "assisted", disabled: !st, title: tr("\u5B9E\u76D8\u4E0B\u5355\u3001\u5212\u8F6C\u9700\u4F60\u6279\u51C6\uFF1B\u9650\u989D\u53EA\u7531\u4F60\u4FEE\u6539", "You approve live orders and transfers; only you change limits"), onClick: () => custody !== "assisted" && void chooseCustody("assisted") }, tr("\u534A\u6258\u7BA1", "Assisted")), /* @__PURE__ */ React33.createElement("button", { type: "button", className: custody === "managed" ? "on" : "", "aria-pressed": custody === "managed", disabled: !st, title: tr("agent \u81EA\u4E3B\u6267\u884C\u5B9E\u76D8\u3001\u8C03\u6574\u9650\u989D\u4E0E\u5212\u8F6C\u4FDD\u8BC1\u91D1", "The agent trades, adjusts limits and moves margin on its own"), onClick: () => custody !== "managed" && void chooseCustody("managed") }, tr("\u5168\u6258\u7BA1", "Managed")))), /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React33.createElement("span", null, tr("\u76D8\u53E3 / \u6210\u4EA4\u4F4D\u7F6E", "Book / trades position")), /* @__PURE__ */ React33.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React33.createElement("button", { type: "button", className: s.tapePlacement === "auto" ? "on" : "", onClick: () => setTapePlacement("auto") }, tr("\u81EA\u9002\u5E94", "Auto")), /* @__PURE__ */ React33.createElement("button", { type: "button", className: s.tapePlacement === "below" ? "on" : "", onClick: () => setTapePlacement("below") }, tr("\u56FE\u8868\u4E0B\u65B9", "Below chart")))), /* @__PURE__ */ React33.createElement("div", { className: "dhl-more-group" }, /* @__PURE__ */ React33.createElement("span", null, tr("\u4EA4\u6613\u8BBE\u7F6E", "Trading settings")), /* @__PURE__ */ React33.createElement("div", { className: "dhl-segment" }, /* @__PURE__ */ React33.createElement("button", { type: "button", onClick: () => {
     setMoreOpen(false);
     setLimitsOpen(true);
-  } }, tr("\u4EA4\u6613\u9650\u989D\u4E0E\u7B7E\u540D\u89C4\u5219", "Limits & signing rules"))))) : null)), /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Modal, { open: Boolean(confirmLive), onClose: () => setConfirmLive(null), title: tr("\u5207\u6362\u5230\u4E3B\u7F51\u5B9E\u76D8", "Switch to mainnet live"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-network-modal", footer: /* @__PURE__ */ React32.createElement(React32.Fragment, null, /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Button, { variant: "outline", onClick: () => setConfirmLive(null) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Button, { variant: "primary", disabled: networkBusy, onClick: () => {
+  } }, tr("\u4EA4\u6613\u9650\u989D\u4E0E\u7B7E\u540D\u89C4\u5219", "Limits & signing rules"))))) : null)), /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Modal, { open: Boolean(confirmLive), onClose: () => setConfirmLive(null), title: tr("\u5207\u6362\u5230\u4E3B\u7F51\u5B9E\u76D8", "Switch to mainnet live"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-network-modal", footer: /* @__PURE__ */ React33.createElement(React33.Fragment, null, /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Button, { variant: "outline", onClick: () => setConfirmLive(null) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Button, { variant: "primary", disabled: networkBusy, onClick: () => {
     if (confirmLive) void applyEnv(confirmLive);
-  } }, tr("\u786E\u8BA4\u5207\u6362", "Switch"))) }, /* @__PURE__ */ React32.createElement("p", null, tr("\u4E3B\u7F51\u5B9E\u76D8\u4F1A\u663E\u793A\u771F\u5B9E\u884C\u60C5\u548C\u771F\u5B9E\u8D26\u6237\uFF0C\u540E\u7EED\u4EA4\u6613\u5C06\u4F7F\u7528\u771F\u5B9E\u8D44\u91D1\u3002", "Mainnet live shows real markets and your real account; trades use real funds."))), /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Modal, { open: confirmManaged, onClose: () => setConfirmManaged(false), title: tr("\u5F00\u542F\u5168\u6258\u7BA1", "Turn on managed mode"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-network-modal", footer: /* @__PURE__ */ React32.createElement(React32.Fragment, null, /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Button, { variant: "outline", onClick: () => setConfirmManaged(false) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React32.createElement(import_dsh_client_ui_primitives10.Button, { variant: "primary", onClick: () => void chooseCustody("managed", true) }, tr("\u5F00\u542F\u5168\u6258\u7BA1", "Turn on"))) }, /* @__PURE__ */ React32.createElement("p", null, tr("\u5168\u6258\u7BA1\u540E\uFF0Cagent \u5728\u5F53\u524D\u5B9E\u76D8\u8D26\u6237\u4E2D\u53EF\u4EE5\uFF1A", "In managed mode the agent can, on this live account:")), /* @__PURE__ */ React32.createElement("ul", { className: "dhl-managed-list" }, /* @__PURE__ */ React32.createElement("li", null, tr("\u4E0D\u7ECF\u9010\u7B14\u6279\u51C6\u76F4\u63A5\u4E0B\u5355\u3001\u64A4\u5355\u548C\u8C03\u6574\u6760\u6746\uFF1B", "place, cancel and re-lever orders without per-trade approval;")), /* @__PURE__ */ React32.createElement("li", null, tr("\u81EA\u884C\u4FEE\u6539\u5141\u8BB8\u4EA4\u6613\u7684\u5E01\u5BF9\u4E0E\u5355\u7B14\u3001\u6BCF\u65E5\u3001\u4ED3\u4F4D\u3001\u6760\u6746\u4E0A\u9650\uFF1B", "change the allowed coins and the order, daily, position and leverage limits;")), /* @__PURE__ */ React32.createElement("li", null, tr("\u5728\u4E3B\u6C38\u7EED\u8D26\u6237\u4E0E HIP-3 \u4EA4\u6613\u6240\u4E4B\u95F4\u5212\u8F6C USDC \u4FDD\u8BC1\u91D1\u3002", "move USDC margin between the core perp account and HIP-3 dexes."))), /* @__PURE__ */ React32.createElement("p", null, tr("dsh-web3 \u94B1\u5305\u81EA\u8EAB\u7684\u7B7E\u540D\u7B56\u7565\u4ECD\u7136\u751F\u6548\u3002\u4F60\u53EF\u4EE5\u968F\u65F6\u5207\u56DE\u534A\u6258\u7BA1\u3002", "The dsh-web3 wallet signing policy still applies. You can switch back to assisted at any time."))), /* @__PURE__ */ React32.createElement(WalletDetails, { open: walletOpen, onClose: () => setWalletOpen(false) }), /* @__PURE__ */ React32.createElement(TradingLimits, { open: limitsOpen, onClose: () => setLimitsOpen(false) }), /* @__PURE__ */ React32.createElement("div", { className: "dhl-toasts" }, marketStale && !resyncing ? /* @__PURE__ */ React32.createElement("div", { className: "dhl-data-warning", role: "status" }, tr("\u884C\u60C5\u6216\u5BBF\u4E3B\u72B6\u6001\u672A\u53CA\u65F6\u66F4\u65B0\uFF1B\u5F53\u524D\u4EF7\u683C\u53EF\u80FD\u8FC7\u671F\u3002\u4EA4\u6613\u7968\u636E\u5DF2\u6682\u505C\u63D0\u4EA4\uFF0C\u7B49\u5F85\u6570\u636E\u6062\u590D\u3002", "Market or host data is stale. Ticket submission is paused until data recovers.")) : null, s.notice ? /* @__PURE__ */ React32.createElement("div", { className: "dhl-notice", onClick: () => notify(null) }, /* @__PURE__ */ React32.createElement(UiIcon, { name: "info", size: 16 }), /* @__PURE__ */ React32.createElement("span", { style: { flex: 1 } }, s.notice.text), /* @__PURE__ */ React32.createElement(UiIcon, { name: "close", size: 14 })) : null), /* @__PURE__ */ React32.createElement("div", { className: "dhl-body" }, showSessions ? /* @__PURE__ */ React32.createElement(SessionsColumn, { width: layout.sessionsWidth, fill: !showDesk && !showChat, onCollapse: toggleSessions }) : /* @__PURE__ */ React32.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleSessions, "aria-label": tr("\u5C55\u5F00\u4F1A\u8BDD\u680F", "Expand sessions"), title: tr("\u5C55\u5F00\u4F1A\u8BDD\u680F", "Expand sessions") }, /* @__PURE__ */ React32.createElement(PanelIcon, { kind: "sessions" })), showSessions && (showDesk || showChat) ? /* @__PURE__ */ React32.createElement(Divider, { side: "left", onResize: resizeSessions, onCommit: commitLayout, onReset: resetSessions }) : null, showDesk ? /* @__PURE__ */ React32.createElement(DeskColumn, { onCollapse: toggleDesk }) : /* @__PURE__ */ React32.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleDesk, "aria-label": tr("\u5C55\u5F00\u884C\u60C5\u533A", "Expand market panel"), title: tr("\u5C55\u5F00\u884C\u60C5\u533A", "Expand market panel") }, /* @__PURE__ */ React32.createElement(PanelIcon, { kind: "desk" })), showDesk && showChat ? /* @__PURE__ */ React32.createElement(Divider, { side: "right", onResize: resizeChat, onCommit: commitLayout, onReset: resetChat }) : null, showChat ? /* @__PURE__ */ React32.createElement(ChatColumn, { width: layout.chatWidth, fill: !showDesk, onCollapse: toggleChat, SessionProvider: props.SessionProvider ?? props.sessionProvider, renderFactorySlot: props.renderFactorySlot }) : /* @__PURE__ */ React32.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleChat, "aria-label": tr("\u5C55\u5F00\u5BF9\u8BDD\u680F", "Expand chat"), title: tr("\u5C55\u5F00\u5BF9\u8BDD\u680F", "Expand chat") }, /* @__PURE__ */ React32.createElement(PanelIcon, { kind: "chat" }))));
+  } }, tr("\u786E\u8BA4\u5207\u6362", "Switch"))) }, /* @__PURE__ */ React33.createElement("p", null, tr("\u4E3B\u7F51\u5B9E\u76D8\u4F1A\u663E\u793A\u771F\u5B9E\u884C\u60C5\u548C\u771F\u5B9E\u8D26\u6237\uFF0C\u540E\u7EED\u4EA4\u6613\u5C06\u4F7F\u7528\u771F\u5B9E\u8D44\u91D1\u3002", "Mainnet live shows real markets and your real account; trades use real funds."))), /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Modal, { open: confirmManaged, onClose: () => setConfirmManaged(false), title: tr("\u5F00\u542F\u5168\u6258\u7BA1", "Turn on managed mode"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-network-modal", footer: /* @__PURE__ */ React33.createElement(React33.Fragment, null, /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Button, { variant: "outline", onClick: () => setConfirmManaged(false) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React33.createElement(import_dsh_client_ui_primitives11.Button, { variant: "primary", onClick: () => void chooseCustody("managed", true) }, tr("\u5F00\u542F\u5168\u6258\u7BA1", "Turn on"))) }, /* @__PURE__ */ React33.createElement("p", null, tr("\u5168\u6258\u7BA1\u540E\uFF0Cagent \u5728\u5F53\u524D\u5B9E\u76D8\u8D26\u6237\u4E2D\u53EF\u4EE5\uFF1A", "In managed mode the agent can, on this live account:")), /* @__PURE__ */ React33.createElement("ul", { className: "dhl-managed-list" }, /* @__PURE__ */ React33.createElement("li", null, tr("\u4E0D\u7ECF\u9010\u7B14\u6279\u51C6\u76F4\u63A5\u4E0B\u5355\u3001\u64A4\u5355\u548C\u8C03\u6574\u6760\u6746\uFF1B", "place, cancel and re-lever orders without per-trade approval;")), /* @__PURE__ */ React33.createElement("li", null, tr("\u81EA\u884C\u4FEE\u6539\u5141\u8BB8\u4EA4\u6613\u7684\u5E01\u5BF9\u4E0E\u5355\u7B14\u3001\u6BCF\u65E5\u3001\u4ED3\u4F4D\u3001\u6760\u6746\u4E0A\u9650\uFF1B", "change the allowed coins and the order, daily, position and leverage limits;")), /* @__PURE__ */ React33.createElement("li", null, tr("\u5728\u4E3B\u6C38\u7EED\u8D26\u6237\u4E0E HIP-3 \u4EA4\u6613\u6240\u4E4B\u95F4\u5212\u8F6C USDC \u4FDD\u8BC1\u91D1\u3002", "move USDC margin between the core perp account and HIP-3 dexes."))), /* @__PURE__ */ React33.createElement("p", null, tr("dsh-web3 \u94B1\u5305\u81EA\u8EAB\u7684\u7B7E\u540D\u7B56\u7565\u4ECD\u7136\u751F\u6548\u3002\u4F60\u53EF\u4EE5\u968F\u65F6\u5207\u56DE\u534A\u6258\u7BA1\u3002", "The dsh-web3 wallet signing policy still applies. You can switch back to assisted at any time."))), /* @__PURE__ */ React33.createElement(WalletDetails, { open: walletOpen, onClose: () => setWalletOpen(false) }), /* @__PURE__ */ React33.createElement(TradingLimits, { open: limitsOpen, onClose: () => setLimitsOpen(false) }), /* @__PURE__ */ React33.createElement(FilePreviewModal, null), /* @__PURE__ */ React33.createElement("div", { className: "dhl-toasts" }, marketStale && !resyncing ? /* @__PURE__ */ React33.createElement("div", { className: "dhl-data-warning", role: "status" }, tr("\u884C\u60C5\u6216\u5BBF\u4E3B\u72B6\u6001\u672A\u53CA\u65F6\u66F4\u65B0\uFF1B\u5F53\u524D\u4EF7\u683C\u53EF\u80FD\u8FC7\u671F\u3002\u4EA4\u6613\u7968\u636E\u5DF2\u6682\u505C\u63D0\u4EA4\uFF0C\u7B49\u5F85\u6570\u636E\u6062\u590D\u3002", "Market or host data is stale. Ticket submission is paused until data recovers.")) : null, s.notice ? /* @__PURE__ */ React33.createElement("div", { className: "dhl-notice", onClick: () => notify(null) }, /* @__PURE__ */ React33.createElement(UiIcon, { name: "info", size: 16 }), /* @__PURE__ */ React33.createElement("span", { style: { flex: 1 } }, s.notice.text), /* @__PURE__ */ React33.createElement(UiIcon, { name: "close", size: 14 })) : null), /* @__PURE__ */ React33.createElement("div", { className: "dhl-body" }, showSessions ? /* @__PURE__ */ React33.createElement(SessionsColumn, { width: layout.sessionsWidth, fill: !showDesk && !showChat, onCollapse: toggleSessions }) : /* @__PURE__ */ React33.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleSessions, "aria-label": tr("\u5C55\u5F00\u4F1A\u8BDD\u680F", "Expand sessions"), title: tr("\u5C55\u5F00\u4F1A\u8BDD\u680F", "Expand sessions") }, /* @__PURE__ */ React33.createElement(PanelIcon, { kind: "sessions" })), showSessions && (showDesk || showChat) ? /* @__PURE__ */ React33.createElement(Divider, { side: "left", onResize: resizeSessions, onCommit: commitLayout, onReset: resetSessions }) : null, showDesk ? /* @__PURE__ */ React33.createElement(DeskColumn, { onCollapse: toggleDesk }) : /* @__PURE__ */ React33.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleDesk, "aria-label": tr("\u5C55\u5F00\u884C\u60C5\u533A", "Expand market panel"), title: tr("\u5C55\u5F00\u884C\u60C5\u533A", "Expand market panel") }, /* @__PURE__ */ React33.createElement(PanelIcon, { kind: "desk" })), showDesk && showChat ? /* @__PURE__ */ React33.createElement(Divider, { side: "right", onResize: resizeChat, onCommit: commitLayout, onReset: resetChat }) : null, showChat ? /* @__PURE__ */ React33.createElement(ChatColumn, { width: layout.chatWidth, fill: !showDesk, onCollapse: toggleChat, SessionProvider: props.SessionProvider ?? props.sessionProvider, renderFactorySlot: props.renderFactorySlot }) : /* @__PURE__ */ React33.createElement("button", { className: "dhl-panel-rail", type: "button", onClick: toggleChat, "aria-label": tr("\u5C55\u5F00\u5BF9\u8BDD\u680F", "Expand chat"), title: tr("\u5C55\u5F00\u5BF9\u8BDD\u680F", "Expand chat") }, /* @__PURE__ */ React33.createElement(PanelIcon, { kind: "chat" }))));
 }
 
 // src/client/components/panel-entry.tsx
-var React33 = __toESM(require("react"), 1);
+var React34 = __toESM(require("react"), 1);
 function PanelEntry(props) {
-  return /* @__PURE__ */ React33.createElement("span", { className: "dhl-entrymark" }, /* @__PURE__ */ React33.createElement(BrandMark, { size: props?.size ?? 18 }));
+  return /* @__PURE__ */ React34.createElement("span", { className: "dhl-entrymark" }, /* @__PURE__ */ React34.createElement(BrandMark, { size: props?.size ?? 18 }));
 }
 
 // src/client/index.tsx
-var inject = ["connection", "slots", "locale", "theme", "layout", "sessions", "workspaces", "uiConversation", "uiWorkspace"];
+var inject = ["connection", "slots", "locale", "theme", "layout", "sessions", "workspaces", "uiConversation", "uiWorkspace", "sidebarRight"];
 function apply(ctx) {
   setContext(ctx);
   setConnection(ctx.get("connection") ?? null);
+  ctx.effect(() => installFileOpenFallback(ctx), NS + ": file open fallback");
   const locale = ctx.get("locale");
   if (locale?.register && locale?.bind) {
     ctx.effect(() => locale.register(NS, DICT), NS + ": dictionaries");
@@ -23365,14 +23518,14 @@ function apply(ctx) {
         locale: NS,
         children: { "hyper.panel.seat": { kind: "single", scope: "session" } }
       },
-      (props) => React34.createElement(App, {
+      (props) => React35.createElement(App, {
         SessionProvider: props?.SessionProvider,
         renderFactorySlot: props?.renderFactorySlot
       })
     )), NS + ": main panel");
     ctx.effect(() => slots.inject("sidebar.panellist", () => slots.register(
       { name: "sidebar.panellist", id: NS, order: 20, label: () => t("app.title", "Hyperliquid \u4EA4\u6613\u53F0"), registrant: NS, locale: NS },
-      (props) => React34.createElement(PanelEntry, props)
+      (props) => React35.createElement(PanelEntry, props)
     )), NS + ": panel entry");
   }
   registerDshExtensions(ctx, slots);

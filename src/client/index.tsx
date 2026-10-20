@@ -23,12 +23,18 @@ import { setConnection, setContext, setLocaleBinder, t } from './remote'
 import { App } from './app'
 import { PanelEntry } from './components/panel-entry'
 import { registerDshExtensions } from './dsh-extensions'
+import { installFileOpenFallback } from './file-preview'
 
-export const inject = ['connection', 'slots', 'locale', 'theme', 'layout', 'sessions', 'workspaces', 'uiConversation', 'uiWorkspace']
+export const inject = ['connection', 'slots', 'locale', 'theme', 'layout', 'sessions', 'workspaces', 'uiConversation', 'uiWorkspace', 'sidebarRight']
 
 export function apply(ctx: any): void {
   setContext(ctx)
   setConnection(ctx.get('connection') ?? null)
+
+  // File links in the desk chat go through the shipped sidebar (fileAddressFor →
+  // sidebarRight.openResource), which needs a mounted rightbar session surface the
+  // desk does not own. Keep the shipped path first; fall back to the desk preview.
+  ctx.effect(() => installFileOpenFallback(ctx), NS + ': file open fallback')
 
   const locale = ctx.get('locale')
   if (locale?.register && locale?.bind) {

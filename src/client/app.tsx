@@ -21,6 +21,7 @@ import { ChatColumn } from './components/chat-column'
 import { PanelIcon, UiIcon } from './components/panel-icons'
 import { WalletDetails } from './components/wallet-details'
 import { TradingLimits } from './components/trading-limits'
+import { FilePreviewModal } from './components/file-preview-modal'
 import { readNativeSessionList } from './native-session-list'
 
 interface AppProps {
@@ -231,6 +232,7 @@ export function App(props: AppProps) {
       </Modal>
       <WalletDetails open={walletOpen} onClose={() => setWalletOpen(false)} />
       <TradingLimits open={limitsOpen} onClose={() => setLimitsOpen(false)} />
+      <FilePreviewModal />
       {/* Floating status: overlays the workbench instead of pushing it down. */}
       <div className="dhl-toasts">
         {marketStale && !resyncing ? <div className="dhl-data-warning" role="status">{tr('行情或宿主状态未及时更新；当前价格可能过期。交易票据已暂停提交，等待数据恢复。', 'Market or host data is stale. Ticket submission is paused until data recovers.')}</div> : null}

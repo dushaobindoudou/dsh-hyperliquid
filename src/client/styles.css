@@ -569,6 +569,18 @@ body:has(.dhl-divider.dragging) * { cursor: col-resize !important; }
 .dhl-risk-budget { margin: 2px 0 0; color: var(--dsw-alias-label-secondary); font-size: 13px; }
 .dhl-risk-error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 13px; }
 
+/* Desk file preview: the fallback when the shipped sidebar cannot open a file link. */
+.dhl-file-modal { width: min(820px, calc(100vw - 48px)); max-height: min(84vh, 920px); }
+.dhl-file-content { max-height: min(68vh, 760px); }
+.dhl-file-note { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 1.6; }
+.dhl-file-note.dhl-file-error { color: var(--dsw-alias-state-error-primary); }
+.dhl-file-text { margin: 0; padding: 10px 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md, 8px); background: var(--dsw-alias-bg-layer-1); overflow: auto; font: 12px/1.6 var(--dsw-font-family-mono, ui-monospace, Menlo, monospace); }
+.dhl-file-line { display: flex; gap: 12px; padding: 0 12px; }
+.dhl-file-line-active { background: var(--dsw-alias-interactive-bg-hover); }
+.dhl-file-gutter { flex: none; width: 44px; padding-right: 8px; text-align: right; color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); opacity: .7; user-select: none; font-variant-numeric: tabular-nums; }
+.dhl-file-code { flex: 1; min-width: 0; white-space: pre; color: var(--dsw-alias-label-primary); }
+.dhl-file-meta { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 11.5px; }
+
 /* hyper_* tool rows and the approval order card (rendered inside DSH's conversation). */
 .dhl-tool-verdict { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); font-size: var(--dsh-content-font-size-secondary, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dhl-tool-verdict.err { color: var(--dsw-alias-state-error-primary); }
