@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { analyzeTrading, checkupText, roundTrips } from '../lib/analysis.js'
 import { rankSignals } from '../lib/scan.js'
 import { createAgentWaker, alertWakeText } from '../lib/wake.js'
-import { deskPrompt, losingStreak, unprotectedPositions } from '../lib/prompt.js'
+import { deskPrompt, deskPromptFor, losingStreak, unprotectedPositions } from '../lib/prompt.js'
 import { HyperStore } from '../lib/store.js'
 import { HyperRemote } from '../lib/remote.js'
 
@@ -98,6 +98,13 @@ text = deskPrompt(remote)
 assert.ok(text.includes('连续亏损 3 笔') && text.includes('档案还缺：常做市场、持仓周期') && !text.includes('【第一次见面】'))
 remote.cfg.tradingMode = 'paper'
 assert.ok(!deskPrompt(remote).includes('最高优先'), 'paper mode never warns about live stops')
+// The section is attached per Agent and only answers inside desk sessions, so an
+// unrelated conversation in the same profile never sees the trading persona.
+const scoped = new HyperStore(mkdtempSync(join(tmpdir(), 'dhl-scope-')))
+const scopedRemote = { cfg: { tradingMode: 'live', network: 'mainnet' }, isManaged: () => false, store: scoped, desk: { coin: 'BTC', interval: '1h' }, lastLiveAccount: null }
+assert.equal(deskPromptFor(scopedRemote, 'session-plain'), '', 'non-desk sessions get no persona')
+scoped.registerSession('session-plain')
+assert.ok(deskPromptFor(scopedRemote, 'session-plain').includes('交易副手'), 'a registered desk session gets the persona')
 // ── HIP-3 alerts fire (their mids are not in core allMids) and reach the waker ──
 const alertStore = new HyperStore(mkdtempSync(join(tmpdir(), 'dhl-hip3-alert-')))
 alertStore.registerSession('s9', { coin: 'xyz:XYZ100' })

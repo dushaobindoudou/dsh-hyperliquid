@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 交易人设与系统提示改为**按会话注入**：`hyperliquid-desk` 段不再注册在宿主根作用域（那会让该 profile 下所有会话都变成交易副手），而是通过 `agent/created` 把 section 注册到每个 Agent 自己的 scope；只有登记在交易台的会话（`store.sessions`）才返回正文，取消登记即不再注入。会话创建后才登记的情况由 `registerSession` 补挂。
 - 修复：交易台右栏的原生会话里点击文件链接没有反应（控制台报 `sidebarRight: no session surface is mounted`）。DSH 的会话用 `sidebarRight.openResource(address)` 打开文件链接，它需要一个挂载中的右侧栏会话面；交易台把主区域换成了自己的三栏，该会话面从未挂载，调用直接抛错。现在仍以 DSH 原生路径为先，只有原生右侧栏无法放置资源时，才由交易台用同一个 `workspaceFiles.read` Remote 弹出文件预览（行号、目标行定位、超长截断提示）；非文件地址（`dsh-resource://absolute/…` 等）照旧抛错。`sidebarRight` 加入客户端依赖声明，新增 `test/file-preview.test.mjs` 回归。
 
 ## 0.5.9 — 2026-10-17

@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { deskPrompt } from './lib/prompt.js'
+import { deskPromptFor } from './lib/prompt.js'
 import { createAgentWaker, marketBarWakeText } from './lib/wake.js'
 import { createStrategyBarMonitor } from './lib/strategy-monitor.js'
 import { createTurnOriginGuard } from './lib/turn-origin.js'
@@ -140,19 +140,47 @@ export function apply(ctx, config = {}) {
     ctx.effect(() => () => { try { skillRemove() } catch { /* already gone */ } })
   }
 
-  // System-prompt section: make the desk discoverable to every agent, with
-  // LIVE desk context (what the user is looking at right now) evaluated per
-  // prompt — the desk and the conversation stay in lockstep both ways.
-  const systemPrompt = typeof ctx?.get === 'function' ? ctx.get('systemPrompt') : undefined
-  if (systemPrompt && typeof systemPrompt.section === 'function') {
-    const remove = systemPrompt.section({
-      name: 'hyperliquid-desk',
-      order: 500,
-      // Fixed core + state the code computes (first meeting, unprotected position, losing streak); see lib/prompt.js.
-      text: () => deskPrompt(remote, { skillLoaded: Boolean(skillRemove) }),
+  // System-prompt section, scoped per Agent: only sessions registered as trading
+  // sessions in this desk carry the trading persona and its live context. The
+  // section is registered in the Agent's own scope (a scoped section shadows a
+  // global one and unwinds with the agent), so unrelated conversations in the
+  // same profile never see it.
+  ctx.inject(['systemPrompt', 'agents'], (scopedCtx) => {
+    const agents = scopedCtx.get('agents')
+    const attached = new Set()
+    const attach = (agent) => {
+      const sessionId = agent?.id ?? agent?.session?.id
+      if (!sessionId || attached.has(sessionId)) return
+      // Registering through the Agent's own context makes the section agent-scoped:
+      // it shadows a global section of the same name and unwinds with the agent.
+      const prompt = agent?.ctx?.get?.('systemPrompt') ?? agent?.ctx?.systemPrompt
+      if (!prompt || typeof prompt.section !== 'function') return
+      attached.add(sessionId)
+      // Live desk context (what the user is looking at right now) is evaluated per
+      // prompt; see lib/prompt.js. Empty outside desk sessions — e.g. a session
+      // unregistered before its agent was created and not re-registered since.
+      const remove = prompt.section({
+        name: 'hyperliquid-desk',
+        order: 500,
+        text: () => deskPromptFor(remote, sessionId, { skillLoaded: Boolean(skillRemove) }),
+      })
+      disposers.push(remove)
+    }
+    scopedCtx.on('agent/created', (payload) => {
+      try { attach(payload?.agent) } catch (error) { ctx.logger?.warn?.('[dsh-hyperliquid] prompt scope', error) }
     })
-    disposers.push(remove)
-  }
+    for (const agent of agents?.list?.() ?? []) {
+      try { attach(agent) } catch { /* per-agent best effort */ }
+    }
+    // The desk registers a session after creating it, so the Agent may predate
+    // its registration: Remote.registerSession asks for the section afterwards.
+    remote.attachDeskPrompt = (sessionId) => {
+      try {
+        const agent = agents?.get?.(sessionId)
+        if (agent) attach(agent)
+      } catch (error) { ctx.logger?.warn?.('[dsh-hyperliquid] prompt scope', error) }
+    }
+  })
 
   return () => {
     for (const d of disposers) {
