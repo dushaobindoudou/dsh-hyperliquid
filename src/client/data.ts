@@ -7,7 +7,7 @@
  * @module src/client/data
  */
 
-import { hyperCall, t, tr } from './remote'
+import { getContext, hyperCall, t, tr } from './remote'
 import { getActiveRef, notify, store } from './store'
 import type { Candle, ChartMark, DeskState, Interval, SessionWorkspace } from './types'
 import { chartReferenceLabel, formatChartReference, type ChartReferenceRef, type ChartSelection } from './chart-reference'
@@ -365,6 +365,33 @@ export function loadTradeHistory(force = false): Promise<void> {
   }).finally(() => { if (historyPending === task) historyPending = null })
   historyPending = task
   return task
+}
+
+const titleAttempts = new Set<string>()
+
+/**
+ * Give a desk session an explicit title.
+ *
+ * DSH's display title is `durable title → cwd directory basename → id`; desk
+ * sessions are created without a title, so the home directory basename (the
+ * account name, e.g. "liepin") would be shown. Naming them once keeps the
+ * default neutral and is durable, so a manual rename is never overwritten.
+ * @param sessionId - the desk session to name.
+ * @param title - the label to store; defaults to the neutral "未命名".
+ */
+export async function titleDeskSession(sessionId: string, title = tr('未命名', 'Untitled')): Promise<void> {
+  if (!sessionId || titleAttempts.has(sessionId)) return
+  const sessionsSvc = getContext()?.get('sessions')
+  if (!sessionsSvc?.using) return
+  try {
+    await sessionsSvc.using(sessionId, { source: 'dsh-hyperliquid.title' }, async (ref: any) => {
+      await ref.ready
+      await ref.binding?.session?.rename?.(title)
+    })
+    // Remembered only after the host accepted the rename; a session the catalog
+    // has not committed yet retries on the next catalog update.
+    titleAttempts.add(sessionId)
+  } catch { /* the title is cosmetic; never block the desk */ }
 }
 
 export async function loadSessions(): Promise<void> {

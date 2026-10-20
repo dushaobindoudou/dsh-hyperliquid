@@ -12,7 +12,7 @@ import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getContext, hyperCall, t, tr } from '../remote'
 import { relTime } from '../format'
 import { getActiveRef, notify, store, useStore } from '../store'
-import { loadSessions, openSession } from '../data'
+import { loadSessions, openSession, titleDeskSession } from '../data'
 import type { SessionRow } from '../types'
 import { FoldIcon, UiIcon } from './panel-icons'
 
@@ -39,6 +39,7 @@ export function SessionsColumn({ width, fill = false, onCollapse }: { width?: nu
       const sessionsSvc = getContext()?.get('sessions')
       if (!sessionsSvc) throw new Error(tr('sessions 服务不可用', 'DSH sessions service unavailable'))
       const id = await sessionsSvc.create({})
+      await titleDeskSession(id)
       const row = await hyperCall('registerSession', { sessionId: id })
       await loadSessions()
       open(id, row.coin ?? 'BTC')

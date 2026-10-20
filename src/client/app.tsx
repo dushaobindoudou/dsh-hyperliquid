@@ -11,7 +11,7 @@ import * as React from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getContext, t, tr } from './remote'
 import { notify, setTapePlacement, store, useStore } from './store'
-import { isMarketStale, openSession, saveSessionWorkspace, setCustody, startPolling, switchNetwork, switchTradingMode } from './data'
+import { isMarketStale, openSession, saveSessionWorkspace, setCustody, startPolling, switchNetwork, switchTradingMode, titleDeskSession } from './data'
 import { DEFAULTS, LIMITS, clampWidth, useLayout } from './layout'
 import { BrandMark } from './components/brand-mark'
 import { Divider } from './components/divider'
@@ -22,7 +22,7 @@ import { PanelIcon, UiIcon } from './components/panel-icons'
 import { WalletDetails } from './components/wallet-details'
 import { TradingLimits } from './components/trading-limits'
 import { FilePreviewModal } from './components/file-preview-modal'
-import { readNativeSessionList } from './native-session-list'
+import { readNativeSessionList, untitledDeskSessions } from './native-session-list'
 
 interface AppProps {
   SessionProvider?: React.ComponentType<any>
@@ -90,6 +90,10 @@ export function App(props: AppProps) {
       const titles: Record<string, string | null> = {}
       for (const [id, row] of Object.entries(byId)) titles[id] = (row as any)?.displayTitle ?? null
       store.patch({ sessionTitles: titles, nativeSessionIds: Object.keys(byId), nativeSessionsReady: snapshot.phase === 'ready' })
+      // A desk session without a durable title would display the cwd basename
+      // (the account name); name it once so the default is neutral.
+      const deskIds = store.get().sessions.map((row) => row.sessionId)
+      for (const id of untitledDeskSessions(byId, deskIds)) void titleDeskSession(id)
     }
     read()
     return list.subscribe(read)

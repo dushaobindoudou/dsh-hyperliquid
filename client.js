@@ -2194,6 +2194,20 @@ function loadTradeHistory(force = false) {
   historyPending = task;
   return task;
 }
+var titleAttempts = /* @__PURE__ */ new Set();
+async function titleDeskSession(sessionId, title = tr("\u672A\u547D\u540D", "Untitled")) {
+  if (!sessionId || titleAttempts.has(sessionId)) return;
+  const sessionsSvc = getContext()?.get("sessions");
+  if (!sessionsSvc?.using) return;
+  try {
+    await sessionsSvc.using(sessionId, { source: "dsh-hyperliquid.title" }, async (ref) => {
+      await ref.ready;
+      await ref.binding?.session?.rename?.(title);
+    });
+    titleAttempts.add(sessionId);
+  } catch {
+  }
+}
 async function loadSessions() {
   try {
     const res = await hyperCall("sessions");
@@ -2638,6 +2652,7 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
       const sessionsSvc = getContext()?.get("sessions");
       if (!sessionsSvc) throw new Error(tr("sessions \u670D\u52A1\u4E0D\u53EF\u7528", "DSH sessions service unavailable"));
       const id = await sessionsSvc.create({});
+      await titleDeskSession(id);
       const row = await hyperCall("registerSession", { sessionId: id });
       await loadSessions();
       open(id, row.coin ?? "BTC");
@@ -22849,6 +22864,15 @@ function TradeTicket({ onSubmitted }) {
 function readNativeSessionList(list) {
   return list?.getSnapshot?.() ?? list?.get?.() ?? null;
 }
+function untitledDeskSessions(byId, deskIds) {
+  if (!byId) return [];
+  const ids = [];
+  for (const id of deskIds) {
+    const row = byId[id];
+    if (row !== void 0 && row.title === void 0) ids.push(id);
+  }
+  return ids;
+}
 
 // src/client/components/chat-column.tsx
 function FixedChatView({ renderSlot }) {
@@ -23422,6 +23446,8 @@ function App(props) {
       const titles = {};
       for (const [id, row] of Object.entries(byId)) titles[id] = row?.displayTitle ?? null;
       store.patch({ sessionTitles: titles, nativeSessionIds: Object.keys(byId), nativeSessionsReady: snapshot.phase === "ready" });
+      const deskIds = store.get().sessions.map((row) => row.sessionId);
+      for (const id of untitledDeskSessions(byId, deskIds)) void titleDeskSession(id);
     };
     read();
     return list.subscribe(read);
