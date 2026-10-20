@@ -18,12 +18,12 @@ const flags: Record<string, [string, string]> = {
 export function TradeReview() {
   const s = useStore(), [days, setDays] = React.useState(30), [scope, setScope] = React.useState('coin')
   const [reload, setReload] = React.useState(0), [data, setData] = React.useState<any>(null), [error, setError] = React.useState(''), [limit, setLimit] = React.useState(50)
-  const identity = `${s.status?.network}:${s.status?.tradingMode}:${s.account?.address ?? ''}:${days}`
+  const identity = `${s.activeSessionId}:${s.status?.network}:${s.status?.tradingMode}:${s.account?.address ?? ''}:${days}`
   const [loadedFor, setLoadedFor] = React.useState('')
   React.useEffect(() => {
     let live = true
     setData(null); setError(''); setLimit(50); setLoadedFor('')
-    void hyperCall('tradeHistory', { includeFunding: true, days }).then((value) => {
+    void hyperCall('tradeHistory', { sessionId: s.activeSessionId, includeFunding: true, days }).then((value) => {
       if (live) { setData(value); setLoadedFor(identity) }
     }).catch((cause) => { if (live) setError(String(cause?.message ?? cause)) })
     return () => { live = false }

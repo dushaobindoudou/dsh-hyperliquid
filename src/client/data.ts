@@ -38,6 +38,8 @@ let accountPending = false
 let historyPending: Promise<void> | null = null
 let historyPendingEpoch = -1
 let accountPendingEpoch = -1
+let accountPendingSessionId: string | null = null
+let historyPendingSessionId: string | null = null
 let eventsPending = false
 let catalogPending: Promise<void> | null = null
 let catalogPendingEpoch = -1
@@ -59,7 +61,7 @@ export async function openSession(sessionId: string, fallbackCoin = 'BTC'): Prom
   store.patch({ activeSessionId: sessionId, workspaceSessionId: null, workspace: null,
     activeCoin: fallbackCoin, interval: '15m', bookGrouping: 'full', chartMarks: [], chartMarksKey: '', candles: [],
     snapshot: null, snapshotAt: 0, selectedMarket: null, selectedMarketAt: 0, fundingRows: [], fundingCoin: null,
-    ticketDraft: null })
+    ticketDraft: null, account: null, accountAt: 0, accountError: null, tradeHistory: null, tradeHistoryAt: 0, tradeHistoryError: null })
   try {
     await workspaceWrites.get(sessionId)?.catch(() => {})
     if (store.get().activeSessionId !== sessionId || loadVersion !== workspaceLoadVersion) return
@@ -69,6 +71,8 @@ export async function openSession(sessionId: string, fallbackCoin = 'BTC'): Prom
     await setDeskCoin(workspace.coin ?? fallbackCoin)
     void loadCandles()
     void loadChartMarks()
+    void loadAccount()
+    void loadTradeHistory(true)
   } catch (error) {
     if (store.get().activeSessionId === sessionId) notify(tr('会话工作台加载失败', 'Could not load session workspace') + '：' + String((error as Error)?.message ?? error))
   }
@@ -337,31 +341,35 @@ export async function loadFunding(): Promise<void> {
 }
 
 export async function loadAccount(): Promise<void> {
-  if (accountPending && accountPendingEpoch === networkEpoch) return
+  const sessionId = store.get().activeSessionId
+  if (accountPending && accountPendingEpoch === networkEpoch && accountPendingSessionId === sessionId) return
   accountPending = true
   const coin = store.get().activeCoin
   const epoch = networkEpoch
   accountPendingEpoch = epoch
+  accountPendingSessionId = sessionId
   try {
-    const account = await hyperCall('account', { coin })
-    if (epoch === networkEpoch && store.get().activeCoin === coin) store.patch({ account, accountError: null, accountAt: Date.now() })
+    const account = await hyperCall('account', { coin, sessionId })
+    if (epoch === networkEpoch && store.get().activeCoin === coin && store.get().activeSessionId === sessionId) store.patch({ account, accountError: null, accountAt: Date.now() })
   } catch (e) {
-    if (epoch === networkEpoch) store.patch({ accountError: String((e as Error)?.message ?? e) })
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ accountError: String((e as Error)?.message ?? e) })
   } finally {
-    if (accountPendingEpoch === epoch) accountPending = false
+    if (accountPendingEpoch === epoch && accountPendingSessionId === sessionId) accountPending = false
   }
 }
 
 /** History is an expensive exchange query; refresh only on demand or every 30s. */
 export function loadTradeHistory(force = false): Promise<void> {
-  if (historyPending && historyPendingEpoch === networkEpoch) return historyPending
+  const sessionId = store.get().activeSessionId
+  if (historyPending && historyPendingEpoch === networkEpoch && historyPendingSessionId === sessionId) return historyPending
   if (!force && Date.now() - store.get().tradeHistoryAt < 30_000) return Promise.resolve()
   const epoch = networkEpoch
   historyPendingEpoch = epoch
-  const task = hyperCall('tradeHistory').then((result) => {
-    if (epoch === networkEpoch) store.patch({ tradeHistory: result, tradeHistoryAt: Date.now(), tradeHistoryError: null })
+  historyPendingSessionId = sessionId
+  const task = hyperCall('tradeHistory', { sessionId }).then((result) => {
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ tradeHistory: result, tradeHistoryAt: Date.now(), tradeHistoryError: null })
   }).catch((error) => {
-    if (epoch === networkEpoch) store.patch({ tradeHistoryError: String((error as Error)?.message ?? error) })
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ tradeHistoryError: String((error as Error)?.message ?? error) })
   }).finally(() => { if (historyPending === task) historyPending = null })
   historyPending = task
   return task
@@ -443,7 +451,7 @@ export async function pollEvents(): Promise<void> {
         if (ev.kind === 'custody.changed') void loadStatus()
         if (ev.kind === 'paper.fill' || ev.kind?.startsWith('live.order.')) { void loadAccount(); void loadTradeHistory(true) }
         if (ev.kind === 'chart.mark' && (ev.data?.sessionId === store.get().activeSessionId || (ev.data?.shared && ev.data?.coin === store.get().activeCoin))) void loadChartMarks()
-        if (ev.kind === 'chart.alert' && (ev.data?.sessionId === store.get().activeSessionId || ev.data?.shared)) {
+        if (ev.kind === 'chart.alert' && (ev.data?.sessionId === store.get().activeSessionId || (ev.data?.shared && ev.data?.sharedScopeId === (store.get().sessions.find((row) => row.sessionId === store.get().activeSessionId)?.strategyScopeId ?? store.get().activeSessionId)))) {
           notify(tr(`${ev.data.coin} 价格${ev.data.direction === 'up' ? '上穿' : '下穿'}「${ev.data.label}」：${ev.data.price}`, `${ev.data.coin} crossed ${ev.data.direction === 'up' ? 'above' : 'below'} "${ev.data.label}": ${ev.data.price}`))
           if (ev.data.coin === store.get().activeCoin) void loadChartMarks()
         }

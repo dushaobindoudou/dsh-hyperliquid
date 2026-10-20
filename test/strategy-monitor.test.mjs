@@ -9,6 +9,7 @@ let reads = 0
 const sessions = [{ sessionId: 'a', coin: 'BTC' }, { sessionId: 'b', coin: 'BTC' }, { sessionId: 'archived', coin: 'ETH', tradingEnabled: false }]
 const remote = {
   cfg: { network: 'testnet', tradingMode: 'live', agentAutoTradeTestnet: true }, isManaged: () => true,
+  isSessionActive: (id) => id !== 'archived',
   store: { journal: (sessionId) => ({ strategies: sessionId === 'a' ? [{ id: 'only-a', status: 'testing', markets: 'BTC' }] : [] }), listSessions: () => sessions },
   candles: async () => { reads++; return { candles: [last] } },
 }

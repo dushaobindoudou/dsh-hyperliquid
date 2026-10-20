@@ -51,6 +51,10 @@ remote.client.snapshot = () => ({ at: Date.now(), data: { user: '0x0000000000000
     coin: 'test:ABC', szi: '2', entryPx: '9', positionValue: '20', unrealizedPnl: '2', leverage: { type: 'cross', value: 2 },
   } }] }],
 ] } })
+remote.client.info = async (type) => {
+  assert.equal(type, 'frontendOpenOrders')
+  return remote.client.frontendOpenOrders()
+}
 const allDexs = await remote.account({ coin: 'test:ABC' })
 assert.equal(allDexs.accountDex, 'test')
 assert.equal(allDexs.positionsCoverage, 'all-dexs')

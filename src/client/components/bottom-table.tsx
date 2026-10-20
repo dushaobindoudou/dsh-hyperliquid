@@ -51,7 +51,7 @@ export function BottomTable({ account, accountError }: { account: any; accountEr
           {[t('positions.coin', '合约'), t('positions.size', '数量'), t('positions.entry', '开仓价'), t('positions.mark', '标记'), t('positions.upnl', '未实现'), 'ROE', tr('清算价', 'Liquidation')].map((label) => <span key={label}>{label}</span>)}
         </div>
         {positions.length === 0
-          ? <div className="dhl-posrow"><span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{t('positions.none', '（无持仓）')}</span></div>
+          ? <div className="dhl-posrow"><span style={{ color: 'var(--dsw-alias-label-secondary)' }}>{accountError || account?.execution?.ownershipConfirmed === false ? tr('本会话持仓归属未确认', 'Session position ownership unconfirmed') : t('positions.none', '（无持仓）')}</span></div>
           : positions.map((p: any, i: number) => {
             const roe = p.returnOnEquity == null ? null : Number(p.returnOnEquity) * 100
             const leverage = typeof p.leverage === 'number' ? p.leverage : Number(p.leverage?.value)

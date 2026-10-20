@@ -119,7 +119,7 @@ export function apply(ctx, config = {}) {
       debounceMs: 1_000, cooldownMs: 60_000, staleMs: 2 * 60_000, describe: marketBarWakeText,
       deliver: async (sessionId, message, { signal }) => {
         if (signal.aborted) return false
-        if (remote.store.getSession(sessionId)?.tradingEnabled === false) return false
+        if (!remote.isSessionActive(sessionId)) return false
         const resolved = await ctx.get('sessionController')?.resolveAgent?.(sessionId)
         if (signal.aborted || !resolved || 'error' in resolved || typeof resolved.agent?.followup !== 'function') return false
         remote.store.setAlertOrigin(sessionId, true)

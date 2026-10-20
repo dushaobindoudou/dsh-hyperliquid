@@ -36,6 +36,7 @@ assert.deepEqual(normalizeWalletSettings(remote.store.walletSettings(), { signer
 assert.throws(() => normalizeWalletSettings({ signer: 'ledger' }), /local 或 web3/)
 // codex release review P1: a decision made under one wallet can never be executed under another
 remote.store.registerSession('s1', { coin: 'BTC' })
+remote.orders = async () => ({ orders: [] })
 let release
 remote.checkLiveOrder = () => new Promise((resolve) => { release = () => resolve({ mid: 100, notionalUsd: 50, network: 'mainnet', address: MAIN }) })
 const pending = remote.prepareOrder({ coin: 'BTC', isBuy: true, sz: 0.5, thesis: '回踩支撑做多，跌破前低止损' }, 's1')

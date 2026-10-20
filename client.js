@@ -1829,6 +1829,8 @@ var accountPending = false;
 var historyPending = null;
 var historyPendingEpoch = -1;
 var accountPendingEpoch = -1;
+var accountPendingSessionId = null;
+var historyPendingSessionId = null;
 var eventsPending = false;
 var catalogPending = null;
 var catalogPendingEpoch = -1;
@@ -1869,7 +1871,13 @@ async function openSession(sessionId, fallbackCoin = "BTC") {
     selectedMarketAt: 0,
     fundingRows: [],
     fundingCoin: null,
-    ticketDraft: null
+    ticketDraft: null,
+    account: null,
+    accountAt: 0,
+    accountError: null,
+    tradeHistory: null,
+    tradeHistoryAt: 0,
+    tradeHistoryError: null
   });
   try {
     await workspaceWrites.get(sessionId)?.catch(() => {
@@ -1881,6 +1889,8 @@ async function openSession(sessionId, fallbackCoin = "BTC") {
     await setDeskCoin(workspace.coin ?? fallbackCoin);
     void loadCandles();
     void loadChartMarks();
+    void loadAccount();
+    void loadTradeHistory(true);
   } catch (error) {
     if (store.get().activeSessionId === sessionId) notify(tr("\u4F1A\u8BDD\u5DE5\u4F5C\u53F0\u52A0\u8F7D\u5931\u8D25", "Could not load session workspace") + "\uFF1A" + String(error?.message ?? error));
   }
@@ -2165,29 +2175,33 @@ async function loadFunding() {
   }
 }
 async function loadAccount() {
-  if (accountPending && accountPendingEpoch === networkEpoch) return;
+  const sessionId = store.get().activeSessionId;
+  if (accountPending && accountPendingEpoch === networkEpoch && accountPendingSessionId === sessionId) return;
   accountPending = true;
   const coin = store.get().activeCoin;
   const epoch = networkEpoch;
   accountPendingEpoch = epoch;
+  accountPendingSessionId = sessionId;
   try {
-    const account = await hyperCall("account", { coin });
-    if (epoch === networkEpoch && store.get().activeCoin === coin) store.patch({ account, accountError: null, accountAt: Date.now() });
+    const account = await hyperCall("account", { coin, sessionId });
+    if (epoch === networkEpoch && store.get().activeCoin === coin && store.get().activeSessionId === sessionId) store.patch({ account, accountError: null, accountAt: Date.now() });
   } catch (e) {
-    if (epoch === networkEpoch) store.patch({ accountError: String(e?.message ?? e) });
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ accountError: String(e?.message ?? e) });
   } finally {
-    if (accountPendingEpoch === epoch) accountPending = false;
+    if (accountPendingEpoch === epoch && accountPendingSessionId === sessionId) accountPending = false;
   }
 }
 function loadTradeHistory(force = false) {
-  if (historyPending && historyPendingEpoch === networkEpoch) return historyPending;
+  const sessionId = store.get().activeSessionId;
+  if (historyPending && historyPendingEpoch === networkEpoch && historyPendingSessionId === sessionId) return historyPending;
   if (!force && Date.now() - store.get().tradeHistoryAt < 3e4) return Promise.resolve();
   const epoch = networkEpoch;
   historyPendingEpoch = epoch;
-  const task = hyperCall("tradeHistory").then((result) => {
-    if (epoch === networkEpoch) store.patch({ tradeHistory: result, tradeHistoryAt: Date.now(), tradeHistoryError: null });
+  historyPendingSessionId = sessionId;
+  const task = hyperCall("tradeHistory", { sessionId }).then((result) => {
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ tradeHistory: result, tradeHistoryAt: Date.now(), tradeHistoryError: null });
   }).catch((error) => {
-    if (epoch === networkEpoch) store.patch({ tradeHistoryError: String(error?.message ?? error) });
+    if (epoch === networkEpoch && store.get().activeSessionId === sessionId) store.patch({ tradeHistoryError: String(error?.message ?? error) });
   }).finally(() => {
     if (historyPending === task) historyPending = null;
   });
@@ -2256,7 +2270,7 @@ async function pollEvents() {
           void loadTradeHistory(true);
         }
         if (ev.kind === "chart.mark" && (ev.data?.sessionId === store.get().activeSessionId || ev.data?.shared && ev.data?.coin === store.get().activeCoin)) void loadChartMarks();
-        if (ev.kind === "chart.alert" && (ev.data?.sessionId === store.get().activeSessionId || ev.data?.shared)) {
+        if (ev.kind === "chart.alert" && (ev.data?.sessionId === store.get().activeSessionId || ev.data?.shared && ev.data?.sharedScopeId === (store.get().sessions.find((row) => row.sessionId === store.get().activeSessionId)?.strategyScopeId ?? store.get().activeSessionId))) {
           notify(tr(`${ev.data.coin} \u4EF7\u683C${ev.data.direction === "up" ? "\u4E0A\u7A7F" : "\u4E0B\u7A7F"}\u300C${ev.data.label}\u300D\uFF1A${ev.data.price}`, `${ev.data.coin} crossed ${ev.data.direction === "up" ? "above" : "below"} "${ev.data.label}": ${ev.data.price}`));
           if (ev.data.coin === store.get().activeCoin) void loadChartMarks();
         }
@@ -2640,7 +2654,7 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
   const s = useStore();
   const [editing, setEditing] = React5.useState(null);
   const [saving, setSaving] = React5.useState(false);
-  const [policy, setPolicy] = React5.useState(null);
+  const [sharing, setSharing] = React5.useState(null);
   const rows = React5.useMemo(() => {
     const titleOf = (id) => s.sessionTitles?.[id] ?? null;
     return s.sessions.filter((row) => !s.archivedSessionIds.includes(row.sessionId) && (!s.nativeSessionsReady || s.nativeSessionIds.includes(row.sessionId))).map((row) => ({ ...row, title: titleOf(row.sessionId) ?? row.title ?? t("session.defaultTitle", "Hyperliquid \u4EA4\u6613\u4F1A\u8BDD") }));
@@ -2690,7 +2704,6 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
     try {
       const ui = getContext()?.get("uiWorkspace");
       if (!ui?.archiveSession) throw new Error(tr("DSH \u5F52\u6863\u670D\u52A1\u4E0D\u53EF\u7528", "DSH archive service unavailable"));
-      await hyperCall("configureSession", { sessionId: id, tradingEnabled: false });
       store.patch({
         archivedSessionIds: [.../* @__PURE__ */ new Set([...before.archivedSessionIds, id])],
         ...active ? { activeSessionId: next?.sessionId ?? null } : {}
@@ -2702,8 +2715,6 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
       }
       await ui.archiveSession(id);
     } catch (error) {
-      await hyperCall("configureSession", { sessionId: id, tradingEnabled: before.sessions.find((row) => row.sessionId === id)?.tradingEnabled !== false }).catch(() => {
-      });
       store.patch((prev) => ({
         archivedSessionIds: prev.archivedSessionIds.filter((entry) => entry !== id),
         ...active ? { activeSessionId: id } : {}
@@ -2712,17 +2723,13 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
       notify(t("session.archiveFailed", "\u5F52\u6863\u4F1A\u8BDD\u5931\u8D25") + "\uFF1A" + String(error?.message ?? error));
     }
   }, []);
-  const savePolicy = async () => {
-    if (!policy) return;
+  const saveSharing = async (mode) => {
+    if (!sharing) return;
     setSaving(true);
     try {
-      await hyperCall("configureSession", {
-        sessionId: policy.id,
-        tradingEnabled: policy.tradingEnabled,
-        ...policy.mode === "keep" ? {} : { mode: policy.mode, sourceSessionId: policy.sourceSessionId }
-      });
+      await hyperCall("configureSession", { sessionId: sharing.id, mode, sourceSessionId: sharing.sourceSessionId });
       await loadSessions();
-      setPolicy(null);
+      setSharing(null);
     } catch (error) {
       notify(String(error?.message ?? error));
     } finally {
@@ -2740,20 +2747,22 @@ function SessionsColumn({ width, fill = false, onCollapse }) {
     },
     /* @__PURE__ */ React5.createElement("span", { className: "coin" }, row.coin ?? "\u2014"),
     /* @__PURE__ */ React5.createElement("span", { className: "title" }, row.title ?? row.sessionId),
-    /* @__PURE__ */ React5.createElement("span", { className: "t", title: relTime(row.updatedAt ?? row.createdAt ?? 0) }, row.tradingEnabled === false ? tr("\u6682\u505C", "Paused") : rows.some((other) => other.sessionId !== row.sessionId && (other.strategyScopeId ?? other.sessionId) === (row.strategyScopeId ?? row.sessionId)) ? tr("\u5171\u4EAB\u89C4\u5219", "Shared rules") : tr("\u72EC\u7ACB", "Independent")),
-    /* @__PURE__ */ React5.createElement("span", { className: "dhl-srow-actions" }, /* @__PURE__ */ React5.createElement("button", { className: "dhl-srow-action", type: "button", title: tr("\u7B56\u7565\u9694\u79BB\u4E0E\u5171\u4EAB", "Strategy isolation and sharing"), "aria-label": tr("\u7B56\u7565\u9694\u79BB\u4E0E\u5171\u4EAB", "Strategy isolation and sharing"), onClick: (event) => {
+    /* @__PURE__ */ React5.createElement("span", { className: "t", title: relTime(row.updatedAt ?? row.createdAt ?? 0) }, rows.some((other) => other.sessionId !== row.sessionId && (other.strategyScopeId ?? other.sessionId) === (row.strategyScopeId ?? row.sessionId)) ? tr("\u5171\u4EAB\u89C4\u5219", "Shared rules") : tr("\u72EC\u7ACB", "Independent")),
+    /* @__PURE__ */ React5.createElement("span", { className: "dhl-srow-actions" }, /* @__PURE__ */ React5.createElement("button", { className: "dhl-srow-action", type: "button", title: tr("\u5171\u4EAB\u4F1A\u8BDD", "Share session"), "aria-label": tr("\u5171\u4EAB\u4F1A\u8BDD", "Share session"), onClick: (event) => {
       event.stopPropagation();
-      setPolicy({ id: row.sessionId, mode: "keep", sourceSessionId: rows.find((item) => item.sessionId !== row.sessionId)?.sessionId ?? "", tradingEnabled: row.tradingEnabled !== false });
-    } }, /* @__PURE__ */ React5.createElement(UiIcon, { name: "settings", size: 14 })), /* @__PURE__ */ React5.createElement("button", { className: "dhl-srow-action", type: "button", title: t("session.rename", "\u91CD\u547D\u540D"), "aria-label": t("session.rename", "\u91CD\u547D\u540D"), onClick: (event) => {
+      setSharing({ id: row.sessionId, sourceSessionId: rows.find((item) => item.sessionId !== row.sessionId)?.sessionId ?? "" });
+    } }, /* @__PURE__ */ React5.createElement(UiIcon, { name: "sync", size: 14 })), /* @__PURE__ */ React5.createElement("button", { className: "dhl-srow-action", type: "button", title: t("session.rename", "\u91CD\u547D\u540D"), "aria-label": t("session.rename", "\u91CD\u547D\u540D"), onClick: (event) => {
       event.stopPropagation();
       setEditing({ id: row.sessionId, title: row.title ?? "" });
     } }, /* @__PURE__ */ React5.createElement(UiIcon, { name: "pencil", size: 14 })), /* @__PURE__ */ React5.createElement("button", { className: "dhl-srow-action", type: "button", title: t("session.archive", "\u5F52\u6863"), "aria-label": t("session.archive", "\u5F52\u6863"), onClick: (event) => {
       event.stopPropagation();
       void archive(row.sessionId);
     } }, /* @__PURE__ */ React5.createElement(UiIcon, { name: "archive", size: 14 })))
-  ))), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Modal, { open: Boolean(policy), onClose: () => setPolicy(null), title: tr("\u4F1A\u8BDD\u4EA4\u6613\u8BBE\u7F6E", "Session trading settings"), closeLabel: t("modal.close", "\u5173\u95ED"), footer: /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: () => setPolicy(null) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: saving || !policy || (policy.mode === "copy" || policy.mode === "shared") && !policy.sourceSessionId, onClick: () => {
-    void savePolicy();
-  } }, t("modal.save", "\u4FDD\u5B58"))) }, /* @__PURE__ */ React5.createElement("p", null, tr("\u6BCF\u4E2A\u542F\u7528\u7684\u4EA4\u6613\u4F1A\u8BDD\u90FD\u5FC5\u987B\u6301\u6709\u81EA\u5DF1\u7684\u4ED3\u4F4D\u3002\u8BA2\u5355\u3001\u63D0\u9192\u548C\u6218\u7EE9\u5206\u522B\u7BA1\u7406\u3002", "Each enabled trading session must hold its own position. Orders, alerts and results are managed separately.")), /* @__PURE__ */ React5.createElement("label", null, /* @__PURE__ */ React5.createElement("input", { type: "checkbox", checked: policy?.tradingEnabled ?? true, onChange: (event) => setPolicy((prev) => prev ? { ...prev, tradingEnabled: event.target.checked } : prev) }), " ", tr("\u542F\u7528\u672C\u4F1A\u8BDD\u4EA4\u6613\u4E0E\u81EA\u52A8\u5165\u573A", "Enable trading and automatic entry for this session")), /* @__PURE__ */ React5.createElement("p", null, /* @__PURE__ */ React5.createElement("label", null, tr("\u7B56\u7565\u8BBE\u7F6E", "Strategy settings"), " ", /* @__PURE__ */ React5.createElement("select", { "aria-label": tr("\u7B56\u7565\u8BBE\u7F6E", "Strategy settings"), value: policy?.mode ?? "keep", onChange: (event) => setPolicy((prev) => prev ? { ...prev, mode: event.target.value } : prev) }, /* @__PURE__ */ React5.createElement("option", { value: "keep" }, tr("\u4FDD\u6301\u5F53\u524D\u8BBE\u7F6E", "Keep current settings")), /* @__PURE__ */ React5.createElement("option", { value: "private" }, tr("\u72EC\u7ACB\u7B56\u7565\uFF08\u6E05\u7A7A\u7B56\u7565\uFF0C\u4FDD\u7559\u6863\u6848\uFF09", "Independent strategy (reset rules, keep profile)")), /* @__PURE__ */ React5.createElement("option", { value: "copy" }, tr("\u590D\u5236\u53E6\u4E00\u4F1A\u8BDD\u7684\u7B56\u7565\uFF0C\u72EC\u7ACB\u8FD0\u884C", "Copy another session\u2019s rules and run independently")), /* @__PURE__ */ React5.createElement("option", { value: "shared" }, tr("\u4E0E\u53E6\u4E00\u4F1A\u8BDD\u5171\u4EAB\u7B56\u7565\u89C4\u5219", "Share strategy rules with another session"))))), (policy?.mode === "copy" || policy?.mode === "shared") && /* @__PURE__ */ React5.createElement("p", null, /* @__PURE__ */ React5.createElement("label", null, tr("\u6765\u6E90\u4F1A\u8BDD", "Source session"), " ", /* @__PURE__ */ React5.createElement("select", { "aria-label": tr("\u6765\u6E90\u4F1A\u8BDD", "Source session"), value: policy.sourceSessionId, onChange: (event) => setPolicy((prev) => prev ? { ...prev, sourceSessionId: event.target.value } : prev) }, rows.filter((row) => row.sessionId !== policy.id).map((row) => /* @__PURE__ */ React5.createElement("option", { key: row.sessionId, value: row.sessionId }, row.coin, " \xB7 ", row.title))))), /* @__PURE__ */ React5.createElement("p", null, tr("\u5171\u4EAB\u4F1A\u540C\u6B65\u6863\u6848\u548C\u7B56\u7565\u4FEE\u8BA2\uFF1B\u8BA2\u5355\u4E0E\u6210\u4EA4\u4EFD\u989D\u59CB\u7EC8\u5C5E\u4E8E\u5404\u81EA\u4F1A\u8BDD\u3002\u540C\u4E00\u8D26\u6237\u540C\u6807\u7684\u7684\u53CD\u5411\u7B56\u7565\u4F1A\u63D0\u793A\u51B2\u7A81\u3002", "Sharing synchronizes profiles and strategy revisions. Orders and filled allocations remain owned by each session. Opposing strategies on the same account and contract report a conflict."))), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Modal, { open: Boolean(editing), onClose: () => setEditing(null), title: t("session.rename", "\u91CD\u547D\u540D\u4F1A\u8BDD"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-rename-modal", footer: /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: () => setEditing(null) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !editing?.title.trim() || saving, onClick: () => {
+  ))), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Modal, { open: Boolean(sharing), onClose: () => setSharing(null), title: tr("\u5171\u4EAB\u4F1A\u8BDD", "Share session"), closeLabel: t("modal.close", "\u5173\u95ED"), footer: /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", disabled: saving, onClick: () => {
+    void saveSharing("private");
+  } }, tr("\u6062\u590D\u72EC\u7ACB", "Make independent")), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: saving || !sharing?.sourceSessionId, onClick: () => {
+    void saveSharing("shared");
+  } }, tr("\u5171\u4EAB", "Share"))) }, /* @__PURE__ */ React5.createElement("p", null, tr("\u4F1A\u8BDD\u9ED8\u8BA4\u72EC\u7ACB\uFF0C\u5E76\u4FDD\u6301\u81EA\u5DF1\u7684\u5165\u573A\u4ED3\u4F4D\u3002\u9009\u62E9\u53E6\u4E00\u4E2A\u4F1A\u8BDD\uFF0C\u5171\u7528\u7B56\u7565\u89C4\u5219\u548C\u6863\u6848\uFF1B\u5404\u81EA\u7684\u6210\u4EA4\u3001\u6302\u5355\u548C\u6218\u7EE9\u4ECD\u72EC\u7ACB\u3002", "Sessions are independent by default and maintain their own positions. Choose another session to share strategy rules and profiles. Fills, open orders and results remain separate.")), /* @__PURE__ */ React5.createElement("label", null, tr("\u5171\u4EAB\u5230", "Share with"), " ", /* @__PURE__ */ React5.createElement("select", { "aria-label": tr("\u5171\u4EAB\u5230", "Share with"), value: sharing?.sourceSessionId ?? "", onChange: (event) => setSharing((prev) => prev ? { ...prev, sourceSessionId: event.target.value } : prev) }, rows.filter((row) => row.sessionId !== sharing?.id).map((row) => /* @__PURE__ */ React5.createElement("option", { key: row.sessionId, value: row.sessionId }, row.coin, " \xB7 ", row.title))))), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Modal, { open: Boolean(editing), onClose: () => setEditing(null), title: t("session.rename", "\u91CD\u547D\u540D\u4F1A\u8BDD"), closeLabel: t("modal.close", "\u5173\u95ED"), className: "dhl-rename-modal", footer: /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: () => setEditing(null) }, t("modal.cancel", "\u53D6\u6D88")), /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !editing?.title.trim() || saving, onClick: () => {
     void saveTitle();
   } }, t("modal.save", "\u4FDD\u5B58"))) }, /* @__PURE__ */ React5.createElement(import_dsh_client_ui_primitives.Input, { "data-modal-autofocus": true, className: "dhl-rename-input", value: editing?.title ?? "", onChange: (event) => setEditing((prev) => prev ? { ...prev, title: event.target.value } : null), onKeyDown: (event) => {
     if (event.key === "Enter") {
@@ -19063,8 +19072,8 @@ function DrawToolbar({ mark, globallyLocked, onEdit, onRemove, onClose, onClone,
       className: mark.shared ? "on" : "",
       "aria-pressed": Boolean(mark.shared),
       disabled: locked,
-      title: mark.shared ? tr("\u53D6\u6D88\u540C\u6B65\uFF08\u53EA\u4FDD\u7559\u5728\u5F53\u524D\u4F1A\u8BDD\uFF09", "Stop syncing (keep in this session)") : tr("\u540C\u6B65\u5230\u8BE5\u5E01\u79CD\u7684\u6240\u6709\u4EA4\u6613\u4F1A\u8BDD", "Sync to every session of this coin"),
-      "aria-label": mark.shared ? tr("\u53D6\u6D88\u540C\u6B65", "Stop syncing") : tr("\u540C\u6B65\u5230\u6240\u6709\u4F1A\u8BDD", "Sync to all sessions"),
+      title: mark.shared ? tr("\u53D6\u6D88\u540C\u6B65\uFF08\u53EA\u4FDD\u7559\u5728\u5F53\u524D\u4F1A\u8BDD\uFF09", "Stop syncing (keep in this session)") : tr("\u540C\u6B65\u5230\u540C\u7EC4\u5171\u4EAB\u4F1A\u8BDD", "Sync within the shared session group"),
+      "aria-label": mark.shared ? tr("\u53D6\u6D88\u540C\u6B65", "Stop syncing") : tr("\u540C\u6B65\u5230\u5171\u4EAB\u4F1A\u8BDD", "Sync to shared sessions"),
       onClick: () => onEdit({ shared: !mark.shared })
     },
     /* @__PURE__ */ React8.createElement("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true" }, /* @__PURE__ */ React8.createElement("path", { d: "M7 7h11l-3-3M17 17H6l3 3" }))
@@ -20980,7 +20989,7 @@ var DrawingList = React12.memo(function DrawingList2({ marks, locked, onSelect, 
     return /* @__PURE__ */ React12.createElement("li", { key: mark.id, "data-mark-id": mark.id, className: mark.hidden ? "is-hidden" : "" }, /* @__PURE__ */ React12.createElement("button", { type: "button", className: "dhl-drawing-list-name", title: tr("\u5728\u56FE\u4E0A\u5B9A\u4F4D\u5E76\u9009\u4E2D", "Find and select on the chart"), onClick: () => {
       onSelect(mark.id);
       setOpen(false);
-    }, disabled: mark.hidden }, /* @__PURE__ */ React12.createElement("span", { style: { color: mark.color } }, /* @__PURE__ */ React12.createElement(ToolIcon, { kind: mark.kind, size: 14 })), /* @__PURE__ */ React12.createElement("b", null, mark.label), /* @__PURE__ */ React12.createElement("small", null, mark.alert ? /* @__PURE__ */ React12.createElement("span", { className: "dhl-list-flag", title: tr("\u4EF7\u683C\u63D0\u9192\u5DF2\u5F00\u542F", "Price alert armed") }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "bell", size: 12 })) : null, mark.shared ? /* @__PURE__ */ React12.createElement("span", { className: "dhl-list-flag", title: tr("\u5DF2\u540C\u6B65\u5230\u6240\u6709\u4F1A\u8BDD", "Synced to all sessions") }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "sync", size: 12 })) : null, tr(tool.zh, tool.en), " \xB7 ", mark.interval, mark.visibleIntervals?.length ? tr(` \xB7 \u4EC5 ${mark.visibleIntervals.join("/")} \u663E\u793A`, ` \xB7 ${mark.visibleIntervals.join("/")} only`) : "", mark.source === "agent" ? " \xB7 agent" : "")), /* @__PURE__ */ React12.createElement("button", { type: "button", "aria-pressed": !mark.hidden, title: mark.hidden ? tr("\u663E\u793A", "Show") : tr("\u9690\u85CF", "Hide"), "aria-label": `${mark.hidden ? tr("\u663E\u793A", "Show") : tr("\u9690\u85CF", "Hide")} ${mark.label}`, onClick: () => onEdit(mark.id, { hidden: !mark.hidden }) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: mark.hidden ? "eyeOff" : "eye", size: 14 })), /* @__PURE__ */ React12.createElement("button", { type: "button", className: mark.locked ? "on" : "", "aria-pressed": Boolean(mark.locked), disabled: locked, title: mark.locked ? tr("\u89E3\u9501", "Unlock") : tr("\u9501\u5B9A", "Lock"), "aria-label": `${mark.locked ? tr("\u89E3\u9501", "Unlock") : tr("\u9501\u5B9A", "Lock")} ${mark.label}`, onClick: () => onEdit(mark.id, { locked: !mark.locked }) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: mark.locked ? "lock" : "unlock", size: 14 })), /* @__PURE__ */ React12.createElement("button", { type: "button", disabled: locked || mark.locked, title: tr("\u5220\u9664", "Delete"), "aria-label": `${tr("\u5220\u9664\u753B\u7EBF", "Remove line")} ${mark.label}`, onClick: () => onRemove(mark.id) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "trash", size: 14 })));
+    }, disabled: mark.hidden }, /* @__PURE__ */ React12.createElement("span", { style: { color: mark.color } }, /* @__PURE__ */ React12.createElement(ToolIcon, { kind: mark.kind, size: 14 })), /* @__PURE__ */ React12.createElement("b", null, mark.label), /* @__PURE__ */ React12.createElement("small", null, mark.alert ? /* @__PURE__ */ React12.createElement("span", { className: "dhl-list-flag", title: tr("\u4EF7\u683C\u63D0\u9192\u5DF2\u5F00\u542F", "Price alert armed") }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "bell", size: 12 })) : null, mark.shared ? /* @__PURE__ */ React12.createElement("span", { className: "dhl-list-flag", title: tr("\u5DF2\u540C\u6B65\u5230\u5171\u4EAB\u4F1A\u8BDD", "Synced to shared sessions") }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "sync", size: 12 })) : null, tr(tool.zh, tool.en), " \xB7 ", mark.interval, mark.visibleIntervals?.length ? tr(` \xB7 \u4EC5 ${mark.visibleIntervals.join("/")} \u663E\u793A`, ` \xB7 ${mark.visibleIntervals.join("/")} only`) : "", mark.source === "agent" ? " \xB7 agent" : "")), /* @__PURE__ */ React12.createElement("button", { type: "button", "aria-pressed": !mark.hidden, title: mark.hidden ? tr("\u663E\u793A", "Show") : tr("\u9690\u85CF", "Hide"), "aria-label": `${mark.hidden ? tr("\u663E\u793A", "Show") : tr("\u9690\u85CF", "Hide")} ${mark.label}`, onClick: () => onEdit(mark.id, { hidden: !mark.hidden }) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: mark.hidden ? "eyeOff" : "eye", size: 14 })), /* @__PURE__ */ React12.createElement("button", { type: "button", className: mark.locked ? "on" : "", "aria-pressed": Boolean(mark.locked), disabled: locked, title: mark.locked ? tr("\u89E3\u9501", "Unlock") : tr("\u9501\u5B9A", "Lock"), "aria-label": `${mark.locked ? tr("\u89E3\u9501", "Unlock") : tr("\u9501\u5B9A", "Lock")} ${mark.label}`, onClick: () => onEdit(mark.id, { locked: !mark.locked }) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: mark.locked ? "lock" : "unlock", size: 14 })), /* @__PURE__ */ React12.createElement("button", { type: "button", disabled: locked || mark.locked, title: tr("\u5220\u9664", "Delete"), "aria-label": `${tr("\u5220\u9664\u753B\u7EBF", "Remove line")} ${mark.label}`, onClick: () => onRemove(mark.id) }, /* @__PURE__ */ React12.createElement(UiIcon, { name: "trash", size: 14 })));
   })) : null);
 });
 
@@ -21239,7 +21248,7 @@ var flags = {
 function TradeReview() {
   const s = useStore(), [days, setDays] = React18.useState(30), [scope, setScope] = React18.useState("coin");
   const [reload, setReload] = React18.useState(0), [data, setData] = React18.useState(null), [error, setError] = React18.useState(""), [limit, setLimit] = React18.useState(50);
-  const identity = `${s.status?.network}:${s.status?.tradingMode}:${s.account?.address ?? ""}:${days}`;
+  const identity = `${s.activeSessionId}:${s.status?.network}:${s.status?.tradingMode}:${s.account?.address ?? ""}:${days}`;
   const [loadedFor, setLoadedFor] = React18.useState("");
   React18.useEffect(() => {
     let live = true;
@@ -21247,7 +21256,7 @@ function TradeReview() {
     setError("");
     setLimit(50);
     setLoadedFor("");
-    void hyperCall("tradeHistory", { includeFunding: true, days }).then((value) => {
+    void hyperCall("tradeHistory", { sessionId: s.activeSessionId, includeFunding: true, days }).then((value) => {
       if (live) {
         setData(value);
         setLoadedFor(identity);
@@ -21299,7 +21308,7 @@ function BottomTable({ account, accountError }) {
   const head = (...cells) => /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow dhl-poshead" }, cells.map((c) => /* @__PURE__ */ React19.createElement("span", { key: c }, c)));
   let body = null;
   if (tab === "positions") {
-    body = /* @__PURE__ */ React19.createElement("div", { className: "dhl-positions-table" }, /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow dhl-posrow-position dhl-poshead" }, [t("positions.coin", "\u5408\u7EA6"), t("positions.size", "\u6570\u91CF"), t("positions.entry", "\u5F00\u4ED3\u4EF7"), t("positions.mark", "\u6807\u8BB0"), t("positions.upnl", "\u672A\u5B9E\u73B0"), "ROE", tr("\u6E05\u7B97\u4EF7", "Liquidation")].map((label) => /* @__PURE__ */ React19.createElement("span", { key: label }, label))), positions.length === 0 ? /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow" }, /* @__PURE__ */ React19.createElement("span", { style: { color: "var(--dsw-alias-label-secondary)" } }, t("positions.none", "\uFF08\u65E0\u6301\u4ED3\uFF09"))) : positions.map((p, i) => {
+    body = /* @__PURE__ */ React19.createElement("div", { className: "dhl-positions-table" }, /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow dhl-posrow-position dhl-poshead" }, [t("positions.coin", "\u5408\u7EA6"), t("positions.size", "\u6570\u91CF"), t("positions.entry", "\u5F00\u4ED3\u4EF7"), t("positions.mark", "\u6807\u8BB0"), t("positions.upnl", "\u672A\u5B9E\u73B0"), "ROE", tr("\u6E05\u7B97\u4EF7", "Liquidation")].map((label) => /* @__PURE__ */ React19.createElement("span", { key: label }, label))), positions.length === 0 ? /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow" }, /* @__PURE__ */ React19.createElement("span", { style: { color: "var(--dsw-alias-label-secondary)" } }, accountError || account?.execution?.ownershipConfirmed === false ? tr("\u672C\u4F1A\u8BDD\u6301\u4ED3\u5F52\u5C5E\u672A\u786E\u8BA4", "Session position ownership unconfirmed") : t("positions.none", "\uFF08\u65E0\u6301\u4ED3\uFF09"))) : positions.map((p, i) => {
       const roe = p.returnOnEquity == null ? null : Number(p.returnOnEquity) * 100;
       const leverage = typeof p.leverage === "number" ? p.leverage : Number(p.leverage?.value);
       return /* @__PURE__ */ React19.createElement("div", { key: `${p.coin}:${i}` }, /* @__PURE__ */ React19.createElement("div", { className: "dhl-posrow dhl-posrow-position" }, /* @__PURE__ */ React19.createElement("span", null, p.coin), /* @__PURE__ */ React19.createElement("span", null, `${p.size > 0 ? "+" : ""}${fmt(p.size, 4)}`), /* @__PURE__ */ React19.createElement("span", null, fmtPrice(p.entryPx)), /* @__PURE__ */ React19.createElement("span", null, p.markPx == null ? "\u2014" : fmtPrice(p.markPx)), /* @__PURE__ */ React19.createElement("span", { className: p.uPnl >= 0 ? "dhl-up" : "dhl-down" }, fmt(p.uPnl)), /* @__PURE__ */ React19.createElement("span", { className: roe == null ? "" : roe >= 0 ? "dhl-up" : "dhl-down" }, roe == null ? "\u2014" : `${fmt(roe)}%`), /* @__PURE__ */ React19.createElement("span", null, p.liquidationPx == null ? "\u2014" : fmtPrice(p.liquidationPx))), account?.mode === "live" ? /* @__PURE__ */ React19.createElement("div", { className: "dhl-position-extra" }, /* @__PURE__ */ React19.createElement("span", null, tr("\u4FDD\u8BC1\u91D1", "Margin"), " ", p.marginUsed == null ? "\u2014" : `${fmt(p.marginUsed)} USDC`), /* @__PURE__ */ React19.createElement("span", null, tr("\u6760\u6746", "Leverage"), " ", Number.isFinite(leverage) && leverage > 0 ? `${leverage}x` : "\u2014"), /* @__PURE__ */ React19.createElement("span", null, tr("\u5F00\u4ED3\u4EE5\u6765\u8D44\u91D1\u8D39", "Funding since open"), " ", p.cumFunding?.sinceOpen == null ? "\u2014" : `${fmt(p.cumFunding.sinceOpen)} USDC`)) : null);
