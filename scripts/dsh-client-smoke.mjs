@@ -34,8 +34,12 @@ try {
   const target = page.getByRole('button', { name: /Hyperliquid/ }).first()
   if ((await target.count()) === 0) throw new Error('sidebar entry not found — plugin panel icon missing')
   const previewDialog = page.getByRole('dialog').filter({ hasText: /预览版说明|内测声明/ }).first()
-  if (await previewDialog.isVisible().catch(() => false)) {
-    await previewDialog.getByRole('button', { name: '继续' }).click()
+  // The preview notice can open a moment after boot; wait briefly before the sidebar click.
+  if (await previewDialog.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false)) {
+    for (let attempt = 0; attempt < 5 && await previewDialog.isVisible().catch(() => false); attempt++) {
+      await previewDialog.getByRole('button', { name: '继续' }).click().catch(() => page.keyboard.press('Escape'))
+      await previewDialog.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {})
+    }
   }
   // First-run onboarding (“添加一个 API Key 开始使用…”) overlays the sidebar on a
   // fresh throwaway profile. Identify it by its exact copy and skip via
@@ -80,19 +84,24 @@ try {
     await row.getByRole('button', { name: '共享会话' }).click()
     const dialog = page.getByRole('dialog', { name: '共享会话' })
     if (await dialog.getByRole('checkbox').count()) throw new Error('unwanted entry enable checkbox remains')
-    await dialog.getByRole('combobox', { name: '共享到' }).selectOption(first)
-    await dialog.getByRole('button', { name: '共享', exact: true }).click()
+    if (await dialog.getByRole('combobox').count()) throw new Error('share dialog still asks for a peer session')
+    const modes = await dialog.getByRole('radio').allTextContents()
+    if (modes.join('|') !== '独立|全局共享') throw new Error(`share dialog offers ${modes.join('|')}`)
+    await dialog.getByRole('radio', { name: '全局共享' }).click()
+    if (process.env.DSH_SMOKE_SHOT) await dialog.screenshot({ path: process.env.DSH_SMOKE_SHOT })
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
     await dialog.waitFor({ state: 'hidden' })
+    if (!(await row.textContent())?.includes('全局共享')) throw new Error('session row does not show global sharing')
     const shared = await page.evaluate(async (id) => window.__dhlCall('chartMarks', { sessionId: id, coin: 'BTC' }), second)
-    if (!shared.marks?.some((mark) => mark.id === independent.mark.id)) throw new Error('explicit sharing did not share the opted-in drawing')
+    if (shared.marks?.length) throw new Error('global sharing leaked another session drawing')
     await row.hover()
     await row.getByRole('button', { name: '共享会话' }).click()
-    await dialog.getByRole('button', { name: '恢复独立' }).click()
+    await dialog.getByRole('radio', { name: '独立' }).click()
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
     await dialog.waitFor({ state: 'hidden' })
-    const detached = await page.evaluate(async (id) => window.__dhlCall('chartMarks', { sessionId: id, coin: 'BTC' }), second)
-    if (detached.marks?.length) throw new Error('restoring independent session kept another session drawing')
+    if (!(await row.textContent())?.includes('独立')) throw new Error('session row does not show independence')
     await page.screenshot({ path: '/tmp/dsh-hyperliquid-session-sharing.png' })
-    console.log('PASS session sharing UI: default isolation, no entry toggle, explicit sharing and detaching')
+    console.log('PASS session sharing UI: independent / global modes only, drawings never cross sessions')
     await browser.close()
     process.exit(0)
   }

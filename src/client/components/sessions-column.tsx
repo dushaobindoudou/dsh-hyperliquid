@@ -12,15 +12,20 @@ import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { getContext, hyperCall, t, tr } from '../remote'
 import { relTime } from '../format'
 import { getActiveRef, notify, store, useStore } from '../store'
-import { loadSessions, openSession, titleDeskSession } from '../data'
+import { loadSessions, openSession } from '../data'
 import type { SessionRow } from '../types'
 import { FoldIcon, UiIcon } from './panel-icons'
+
+type ShareMode = 'private' | 'shared'
+const SHARE_MODES: ReadonlyArray<readonly [ShareMode, string, string]> = [['private', '独立', 'Independent'], ['shared', '全局共享', 'Global']]
+/** Only the global rule set is shared; every other scope is private to its session. */
+const shareModeOf = (row: SessionRow): ShareMode => row.strategyScopeId === 'global' ? 'shared' : 'private'
 
 export function SessionsColumn({ width, fill = false, onCollapse }: { width?: number; fill?: boolean; onCollapse: () => void }) {
   const s = useStore()
   const [editing, setEditing] = React.useState<{ id: string; title: string } | null>(null)
   const [saving, setSaving] = React.useState(false)
-  const [sharing, setSharing] = React.useState<{ id: string; sourceSessionId: string } | null>(null)
+  const [sharing, setSharing] = React.useState<{ id: string; current: ShareMode; mode: ShareMode } | null>(null)
   const rows = React.useMemo(() => {
     const titleOf = (id: string) => s.sessionTitles?.[id] ?? null
     return s.sessions.filter((row) => !s.archivedSessionIds.includes(row.sessionId) &&
@@ -40,7 +45,6 @@ export function SessionsColumn({ width, fill = false, onCollapse }: { width?: nu
       const sessionsSvc = getContext()?.get('sessions')
       if (!sessionsSvc) throw new Error(tr('sessions 服务不可用', 'DSH sessions service unavailable'))
       const id = await sessionsSvc.create({})
-      await titleDeskSession(id)
       const row = await hyperCall('registerSession', { sessionId: id })
       await loadSessions()
       open(id, row.coin ?? 'BTC')
@@ -96,15 +100,24 @@ export function SessionsColumn({ width, fill = false, onCollapse }: { width?: nu
     }
   }, [])
 
-  const saveSharing = async (mode: 'private' | 'shared') => {
-    if (!sharing) return
+  const saveSharing = async () => {
+    if (!sharing || saving) return
+    if (sharing.mode === sharing.current) { setSharing(null); return }
     setSaving(true)
     try {
-      await hyperCall('configureSession', { sessionId: sharing.id, mode, sourceSessionId: sharing.sourceSessionId })
+      await hyperCall('configureSession', { sessionId: sharing.id, mode: sharing.mode })
       await loadSessions()
       setSharing(null)
     } catch (error) { notify(String((error as Error)?.message ?? error)) }
     finally { setSaving(false) }
+  }
+
+  // 盯盘 is the session's consent to automatic wakes and autonomous trading.
+  const toggleWatch = async (row: SessionRow) => {
+    try {
+      await hyperCall('configureSession', { sessionId: row.sessionId, watch: !row.watch })
+      await loadSessions()
+    } catch (error) { notify(String((error as Error)?.message ?? error)) }
   }
 
   return (
@@ -131,18 +144,25 @@ export function SessionsColumn({ width, fill = false, onCollapse }: { width?: nu
             >
               <span className="coin">{row.coin ?? '—'}</span>
               <span className="title">{row.title ?? row.sessionId}</span>
-              <span className="t" title={relTime(row.updatedAt ?? row.createdAt ?? 0)}>{rows.some((other) => other.sessionId !== row.sessionId && (other.strategyScopeId ?? other.sessionId) === (row.strategyScopeId ?? row.sessionId)) ? tr('共享规则', 'Shared rules') : tr('独立', 'Independent')}</span>
+              <span className="t" title={relTime(row.updatedAt ?? row.createdAt ?? 0)}>{shareModeOf(row) === 'shared' ? tr('全局共享', 'Global') : tr('独立', 'Independent')}{row.watch ? <span className="dhl-srow-watch">{tr(' · 盯盘 ', ' · Watch ') + (row.watchInterval ?? '15m')}</span> : null}</span>
               <span className="dhl-srow-actions">
-                <button className="dhl-srow-action" type="button" title={tr('共享会话', 'Share session')} aria-label={tr('共享会话', 'Share session')} onClick={(event) => { event.stopPropagation(); setSharing({ id: row.sessionId, sourceSessionId: rows.find((item) => item.sessionId !== row.sessionId)?.sessionId ?? '' }) }}><UiIcon name="sync" size={14} /></button>
+                <button className="dhl-srow-action" type="button" data-watch={row.watch ? 'on' : 'off'} title={row.watch ? tr('关闭盯盘', 'Stop watching') : tr('开启盯盘：按策略周期自动唤醒本会话并自主交易', 'Watch: wake this session on each strategy bar and trade on its own')} aria-label={row.watch ? tr('关闭盯盘', 'Stop watching') : tr('开启盯盘', 'Watch')} aria-pressed={row.watch === true} onClick={(event) => { event.stopPropagation(); void toggleWatch(row) }}><UiIcon name={row.watch ? 'eyeOff' : 'eye'} size={14} /></button>
+                <button className="dhl-srow-action" type="button" title={tr('共享会话', 'Share session')} aria-label={tr('共享会话', 'Share session')} onClick={(event) => { event.stopPropagation(); const mode = shareModeOf(row); setSharing({ id: row.sessionId, current: mode, mode }) }}><UiIcon name="sync" size={14} /></button>
                 <button className="dhl-srow-action" type="button" title={t('session.rename', '重命名')} aria-label={t('session.rename', '重命名')} onClick={(event) => { event.stopPropagation(); setEditing({ id: row.sessionId, title: row.title ?? '' }) }}><UiIcon name="pencil" size={14} /></button>
                 <button className="dhl-srow-action" type="button" title={t('session.archive', '归档')} aria-label={t('session.archive', '归档')} onClick={(event) => { event.stopPropagation(); void archive(row.sessionId) }}><UiIcon name="archive" size={14} /></button>
               </span>
             </div>
           ))}
       </div>
-      <Modal open={Boolean(sharing)} onClose={() => setSharing(null)} title={tr('共享会话', 'Share session')} closeLabel={t('modal.close', '关闭')} footer={<><Button variant="outline" disabled={saving} onClick={() => { void saveSharing('private') }}>{tr('恢复独立', 'Make independent')}</Button><Button variant="primary" disabled={saving || !sharing?.sourceSessionId} onClick={() => { void saveSharing('shared') }}>{tr('共享', 'Share')}</Button></>}>
-        <p>{tr('会话默认独立，并保持自己的入场仓位。选择另一个会话，共用策略规则和档案；各自的成交、挂单和战绩仍独立。', 'Sessions are independent by default and maintain their own positions. Choose another session to share strategy rules and profiles. Fills, open orders and results remain separate.')}</p>
-        <label>{tr('共享到', 'Share with')} <select aria-label={tr('共享到', 'Share with')} value={sharing?.sourceSessionId ?? ''} onChange={(event) => setSharing((prev) => prev ? { ...prev, sourceSessionId: event.target.value } : prev)}>{rows.filter((row) => row.sessionId !== sharing?.id).map((row) => <option key={row.sessionId} value={row.sessionId}>{row.coin} · {row.title}</option>)}</select></label>
+      <Modal open={Boolean(sharing)} onClose={() => setSharing(null)} title={tr('共享会话', 'Share session')} closeLabel={t('modal.close', '关闭')} className="dhl-rename-modal dhl-share-modal" footer={<><Button variant="outline" onClick={() => setSharing(null)}>{t('modal.cancel', '取消')}</Button><Button variant="primary" disabled={saving || sharing?.mode === sharing?.current} onClick={() => { void saveSharing() }}>{t('modal.save', '保存')}</Button></>}>
+        <div className="dhl-segment" role="radiogroup" aria-label={tr('共享方式', 'Sharing')}>
+          {SHARE_MODES.map(([mode, zh, en]) => <button key={mode} type="button" role="radio" aria-checked={sharing?.mode === mode} className={sharing?.mode === mode ? 'on' : ''} disabled={saving}
+            onClick={() => setSharing((prev) => prev ? { ...prev, mode } : prev)}>{tr(zh, en)}</button>)}
+        </div>
+        <p className="dhl-share-note">{sharing?.mode === 'shared'
+          ? tr('与所有「全局共享」会话共用同一套策略规则和档案，任一会话修改后其他会话同步生效。', 'Uses the one strategy rule set and profile shared by every Global session; edits apply to all of them.')
+          : tr('只使用本会话自己的策略规则和档案。从全局共享切回时，保留当前规则的一份副本。', 'Uses this session\'s own strategy rules and profile. Switching back from Global keeps a copy of the current rules.')}</p>
+        <p className="dhl-share-note">{tr('无论哪种方式，成交、委托、K 线画线和战绩都只属于本会话。', 'Either way, fills, orders, chart drawings and results stay with this session.')}</p>
       </Modal>
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={t('session.rename', '重命名会话')} closeLabel={t('modal.close', '关闭')} className="dhl-rename-modal" footer={<><Button variant="outline" onClick={() => setEditing(null)}>{t('modal.cancel', '取消')}</Button><Button variant="primary" disabled={!editing?.title.trim() || saving} onClick={() => { void saveTitle() }}>{t('modal.save', '保存')}</Button></>}>
         <Input data-modal-autofocus className="dhl-rename-input" value={editing?.title ?? ''} onChange={(event) => setEditing((prev) => prev ? { ...prev, title: event.target.value } : null)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void saveTitle() } }} maxLength={120} aria-label={t('session.name', '会话名称')} />

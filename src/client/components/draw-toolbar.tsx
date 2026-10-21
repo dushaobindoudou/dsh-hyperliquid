@@ -118,11 +118,6 @@ export function DrawToolbar({ mark, globallyLocked, onEdit, onRemove, onClose, o
           aria-label={mark.alert ? tr('关闭价格提醒', 'Turn off price alert') : tr('开启价格提醒', 'Turn on price alert')} onClick={() => onEdit({ alert: !mark.alert })}>
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0" /></svg>
         </button> : null}
-        <button type="button" className={mark.shared ? 'on' : ''} aria-pressed={Boolean(mark.shared)} disabled={locked}
-          title={mark.shared ? tr('取消同步（只保留在当前会话）', 'Stop syncing (keep in this session)') : tr('同步到同组共享会话', 'Sync within the shared session group')}
-          aria-label={mark.shared ? tr('取消同步', 'Stop syncing') : tr('同步到共享会话', 'Sync to shared sessions')} onClick={() => onEdit({ shared: !mark.shared })}>
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3" /></svg>
-        </button>
         <button type="button" title={tr('复制一份（Ctrl/Cmd+C、V）', 'Clone (Ctrl/Cmd+C, V)')} aria-label={tr('复制画线', 'Clone drawing')} onClick={onClone}>
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
         </button>

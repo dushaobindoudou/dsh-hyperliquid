@@ -55,7 +55,7 @@ export const Config = z.object({
   maxPositionUsd: z.number().description('交易限额（paper/live 均生效）：每币最大仓位名义价值 USD').default(500),
   maxLeverage: z.number().description('交易限额（paper/live 均生效）：最大杠杆倍数').default(2),
   wakeAgentOnAlert: z.boolean().description('价格提醒触发时唤醒该交易会话的 agent（只通知并复核，不会自动交易；同一会话 5 分钟内最多一次）').default(true),
-  agentAutoTradeTestnet: z.boolean().description('自主交易开关：已收盘 15m K 线唤醒 agent；开启后（live + 全托管，testnet 与 mainnet 均生效）自动轮可执行授权交易操作；所有实盘开仓必须带止损价并核对保护单。提现插件永不实现').default(false),
+  agentAutoTradeTestnet: z.boolean().description('已弃用：自动唤醒与自主交易改由每个交易会话的「盯盘」开关决定，此项不再生效').default(false),
 }).description('Hyperliquid 交易台配置')
 
 /**
@@ -73,8 +73,9 @@ export function apply(ctx, config = {}) {
   const authorizeTurn = createTurnOriginGuard(ctx, {
     origin: { get: (sessionId) => remote.store.alertOrigin(sessionId), set: (sessionId, alert) => remote.store.setAlertOrigin(sessionId, alert) },
     isLive: () => remote.cfg.tradingMode === 'live',
-    canAutoTrade: (sessionId) => Boolean(sessionId && remote.store.getSession(sessionId) && remote.cfg.agentAutoTradeTestnet &&
-      remote.cfg.tradingMode === 'live' && remote.isManaged()),
+    // 盯盘 is the autonomy grant: a watched session's automatic rounds may trade
+    // (半托管 still asks the user to approve each order).
+    canAutoTrade: (sessionId) => Boolean(sessionId && remote.store.getSession(sessionId)?.watch === true),
   })
 
   // Agent tools (optional service — degrade gracefully).
@@ -94,6 +95,8 @@ export function apply(ctx, config = {}) {
     const waker = createAgentWaker({
       deliver: async (sessionId, text, { signal }) => {
         if (signal.aborted) return false
+        // A session the user has not turned 盯盘 on for is never woken.
+        if (remote.store.getSession(sessionId)?.watch !== true) return false
         // Resolved at delivery time: optional services may register after this plugin applies.
         const sessionController = ctx.get('sessionController')
         if (typeof sessionController?.resolveAgent !== 'function') return false
@@ -112,9 +115,9 @@ export function apply(ctx, config = {}) {
     ctx.effect(() => () => { remote.alertListeners.delete(onAlert); waker.dispose() })
   }
 
-  // A closed 15m bar is the AI's decision checkpoint. It is independent of the
-  // hourly scheduler and is enabled only for explicitly configured autonomy.
-  if (remote.cfg.agentAutoTradeTestnet && typeof ctx?.get === 'function') {
+  // A closed bar of a watched session's interval is the AI's decision checkpoint.
+  // Only sessions with 盯盘 on are woken, and those rounds may trade.
+  if (typeof ctx?.get === 'function') {
     const waker = createAgentWaker({
       debounceMs: 1_000, cooldownMs: 60_000, staleMs: 2 * 60_000, describe: marketBarWakeText,
       deliver: async (sessionId, message, { signal }) => {

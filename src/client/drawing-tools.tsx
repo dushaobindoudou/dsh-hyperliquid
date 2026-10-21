@@ -288,7 +288,7 @@ function guide(a: Pt, b: Pt, value: string, key: string, text: (x: number, y: nu
   return <g key={key}><line className="dhl-drawing-mid" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />{text((a.x + b.x) / 2, (a.y + b.y) / 2 - 4, value, 'middle', 'dhl-drawing-text dhl-ratio-label')}</g>
 }
 
-const BADGE_PATHS = { alert: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', shared: 'M4 9h13l-3-3M20 15H7l3 3' }
+const BADGE_PATHS = { alert: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0' }
 
 const DASH: Record<LineStyleName, string | undefined> = { solid: undefined, dashed: '7 5', dotted: '1.5 4' }
 
@@ -312,7 +312,6 @@ export interface ShapeProps {
   id?: string
   /** Status icons near the first anchor (primitives, so React.memo holds). */
   alert?: boolean
-  shared?: boolean
   /** Volume profile settings. */
   rows?: number
   valueArea?: number
@@ -332,9 +331,9 @@ export interface ShapeProps {
 }
 
 /** One drawing as SVG; `points` are in click order (a preview passes clicks + hover). */
-export const DrawingShape = React.memo(function DrawingShape({ kind, points, label, text: textValue, className, view, anchors = false, interactive = false, color, lineWidth, lineStyle, id, alert, shared, rows, valueArea, levels, fontSize, bold, italic, fillOpacity, extendLeft, extendRight, screenX, screenY }: ShapeProps) {
+export const DrawingShape = React.memo(function DrawingShape({ kind, points, label, text: textValue, className, view, anchors = false, interactive = false, color, lineWidth, lineStyle, id, alert, rows, valueArea, levels, fontSize, bold, italic, fillOpacity, extendLeft, extendRight, screenX, screenY }: ShapeProps) {
   const k = (fontSize ?? 12) / 12
-  const badges = [...(alert ? ['alert' as const] : []), ...(shared ? ['shared' as const] : [])]
+  const badges = alert ? ['alert' as const] : []
   const { width: w, height: h } = view
   // A screen-pinned drawing ignores its time / price and sits at a fixed spot on the plot.
   const pinned = screenX != null && screenY != null

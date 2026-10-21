@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { HyperStore } from '../lib/store.js'
 import { HyperRemote } from '../lib/remote.js'
 import { buildToolDefinitions } from '../lib/tools.js'
-import { sessionExposure, assertSessionIntent } from '../lib/session-execution.js'
+import { sessionExposure, assertSessionIntent, orderOwnership } from '../lib/session-execution.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'dhl-isolation-'))
 const store = new HyperStore(dir)
@@ -16,19 +16,43 @@ store.registerSession('new-eth', { coin: 'ETH' })
 assert.deepEqual(store.journal('new-eth').profile, {}, 'new chats never inherit unowned global instructions')
 assert.deepEqual(store.journal('a').strategies.map((row) => row.id), ['old-a'])
 assert.deepEqual(store.journal('b').strategies.map((row) => row.id), ['old-b'])
-store.configureSession('b', { mode: 'copy', sourceSessionId: 'a' })
-store.saveJournal({ ...store.journal('b'), strategies: [{ id: 'copy' }] }, 'b')
-assert.equal(store.journal('a').strategies[0].id, 'old-a', 'copy is independent')
-store.configureSession('b', { mode: 'shared', sourceSessionId: 'a' })
+assert.throws(() => store.configureSession('b', { mode: 'copy' }), /独立或全局共享/, 'only independent and global sharing exist')
+assert.equal(store.getSession('b').watch, false, '盯盘 starts off: no session is woken without the user')
+store.configureSession('b', { watch: true })
+assert.equal(new HyperStore(dir).getSession('b').watch, true, '盯盘 survives a restart')
+store.registerSession('b', { coin: 'BTC' })
+assert.equal(store.getSession('b').watch, true, 're-registering keeps the user choice')
+assert.throws(() => store.configureSession('b', { watch: 'yes' }), /开或关/)
+store.configureSession('b', { watch: false })
+store.configureSession('a', { mode: 'shared' })
+assert.equal(store.journal('a').strategies[0].id, 'old-a', 'the first shared session seeds the global rules with its own')
+store.configureSession('b', { mode: 'shared' })
+assert.equal(store.journal('b').strategies[0].id, 'old-a', 'joining adopts the global rules')
 assert.equal(store.journal('b').entries[0].strategyId, 'old-b', 'sharing preserves b private logs')
 assert.equal(store.journal('a').entries[0].strategyId, 'old-a')
 store.saveJournal({ ...store.journal('b'), strategies: [{ id: 'shared' }] }, 'b')
 assert.equal(store.journal('a').strategies[0].id, 'shared')
+assert.equal(store.journal('new-eth').strategies.length, 0, 'independent sessions never see the global rules')
 store.removeSession('a')
 assert.equal(new HyperStore(dir).journal('b').strategies[0].id, 'shared', 'sharing survives source deletion and restart')
 store.configureSession('b', { mode: 'private' })
 assert.equal(store.journal('b').strategies[0].id, 'shared', 'detaching keeps a private copy of current rules')
 assert.equal(store.journal('b').entries[0].strategyId, 'old-b')
+store.saveJournal({ ...store.journal('b'), strategies: [{ id: 'mine' }] }, 'b')
+store.configureSession('new-eth', { mode: 'shared' })
+assert.equal(store.journal('new-eth').strategies[0].id, 'shared', 'a private edit after detaching never reaches the global rules')
+
+// Pairwise sharing from older builds becomes independent copies of the same rules.
+const pairDir = mkdtempSync(join(tmpdir(), 'dhl-isolation-pair-'))
+const pair = new HyperStore(pairDir)
+pair.registerSession('p', { coin: 'BTC' }); pair.registerSession('q', { coin: 'BTC' })
+pair.saveJournal({ profile: {}, strategies: [{ id: 'pair' }], entries: [] }, 'p')
+pair.getSession('q').strategyScopeId = 'p'; pair.registerSession('q')
+const split = new HyperStore(pairDir)
+assert.notEqual(split.getSession('q').strategyScopeId, 'p')
+assert.equal(split.journal('q').strategies[0].id, 'pair')
+split.saveJournal({ ...split.journal('q'), strategies: [{ id: 'q-only' }] }, 'q')
+assert.equal(split.journal('p').strategies[0].id, 'pair')
 
 const records = {
   ca: { sessionId: 'a', coin: 'BTC', network: 'testnet', address: 'wallet', orderIds: [1, 3] },
@@ -48,6 +72,23 @@ assert.equal(view.sessionSize, 2, 'a stop for a does not close b allocation')
 view = sessionExposure({ ...args, fills: [fill(99, 'A', 0.5, 3, 3), ...args.fills], size: 2.5 })
 assert.equal(view.ownershipConfirmed, false, 'external reduction must be reconciled')
 assert.equal(sessionExposure({ ...args, network: 'mainnet' }).sessionSize, 0, 'no network leakage')
+
+// Hyperliquid returns TPSL children with cloid null and no child oid in the receipt, so a
+// bracket is attributed by its own protective prices instead of the (missing) cloid.
+const bracket = {
+  cbracket: { sessionId: 'b', coin: 'BTC', sz: 0.0003, network: 'testnet', address: 'wallet', orderIds: [11],
+    protection: { stopLossPx: 82500, takeProfitPx: 83500 } },
+}
+const trig = (oid, triggerPx) => ({ coin: 'BTC', oid, sz: '0.0003', isTrigger: true, reduceOnly: true, triggerPx: String(triggerPx), cloid: null })
+const ownership = orderOwnership({ orders: [trig(12, 82500), trig(13, 83500)], records: bracket, network: 'testnet', address: 'wallet' })
+assert.equal(ownership.orderOwners['12'], 'b', 'stop child without cloid resolves through its trigger price')
+assert.equal(ownership.orderOwners['13'], 'b', 'take-profit child without cloid resolves through its trigger price')
+const ambiguous = orderOwnership({ orders: [trig(14, 82500)], records: { ...bracket,
+  cdup: { sessionId: 'a', coin: 'BTC', sz: 0.0003, network: 'testnet', address: 'wallet', protection: { stopLossPx: 82500 } } },
+  network: 'testnet', address: 'wallet' })
+assert.equal(ambiguous.orderOwners['14'], undefined, 'two sessions with the same bracket stay unattributed')
+assert.equal(orderOwnership({ orders: [trig(15, 82500)], records: bracket, network: 'mainnet', address: 'wallet' }).orderOwners['15'], undefined,
+  'trigger attribution never leaks across networks')
 
 // Real tool path: same-contract paper strategies keep separate brackets and close only their own size.
 const remote = Object.create(HyperRemote.prototype)
@@ -123,4 +164,18 @@ const scopedHistory = await live.sessionHistory({ days: 30 }, 'a')
 assert.equal(scopedHistory.fills.length, 2)
 assert.equal(scopedHistory.fills[0].closedPnl, -10)
 assert.deepEqual(scopedHistory.localOrders.map((row) => row.cloid), ['cx'])
-console.log('会话隔离：旧日志迁移、复制/共享、订单归属、同向独立止损与越权减仓通过')
+// Only the old desk placeholder is handed back to DSH's automatic titling; a real rename stays pinned.
+const titled = Object.create(HyperRemote.prototype)
+titled.store = new HyperStore(mkdtempSync(join(tmpdir(), 'dhl-title-')))
+titled.store.registerSession('p'); titled.store.registerSession('r')
+const titleOf = { p: { title: '未命名', messageSeqs: [], source: { kind: 'user' } }, r: { title: 'BTC 波段', messageSeqs: [], source: { kind: 'user' } } }
+const refreshed = []
+titled.hostCtx = { get: (name) => name === 'sessionTitle'
+  ? { get: (session) => titleOf[session.id], refresh: async (session) => { refreshed.push(session.id); return { title: '突破策略', source: { kind: 'provider' } } } }
+  : name === 'sessionController' ? { resolveAgent: async (id) => ({ agent: { session: { id } } }) } : undefined }
+assert.deepEqual(await titled.restoreAutoTitle({ sessionId: 'p' }), { restored: true, title: '突破策略' })
+assert.deepEqual(await titled.restoreAutoTitle({ sessionId: 'r' }), { restored: false })
+assert.deepEqual(await titled.restoreAutoTitle({ sessionId: 'not-desk' }), { restored: false })
+assert.deepEqual(refreshed, ['p'], 'a user rename is never unpinned')
+
+console.log('会话隔离：旧日志迁移、独立/全局共享、订单归属、同向独立止损与越权减仓通过')

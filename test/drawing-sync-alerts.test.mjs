@@ -1,6 +1,6 @@
-// Drawings synced across a coin's sessions, price-cross alerts on lines, and the sticker library.
+// Drawings stay with their session, price-cross alerts on lines, and the sticker library.
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { HyperStore } from '../lib/store.js'
@@ -16,26 +16,29 @@ remote.desk = { coin: 'BTC', interval: '1h' }
 remote.alertSides = new Map()
 const now = Date.now()
 
-// ── sync ──
+// ── per-session drawings ──
 const line = await remote.drawChartMark({ sessionId: 'a', coin: 'BTC', interval: '1h', kind: 'level', label: '关键位', price: 100 })
 assert.deepEqual(store.listChartMarks('b', 'BTC', null).map((m) => m.id), [], 'a session drawing stays in its session')
-const synced = await remote.updateChartMark({ sessionId: 'a', id: line.id, patch: { shared: true } })
-assert.equal(synced.shared, true)
-assert.equal(store.listChartMarks('b', 'BTC', null).length, 0, 'independent b cannot see a drawing even if a enabled syncing')
+store.configureSession('a', { mode: 'shared' }); store.configureSession('b', { mode: 'shared' })
+assert.deepEqual(store.listChartMarks('b', 'BTC', null), [], 'global sharing shares rules, never drawings')
 assert.throws(() => store.getChartMark('b', line.id), /不属于/)
-store.configureSession('b', { mode: 'shared', sourceSessionId: 'a' })
-assert.deepEqual(store.listChartMarks('b', 'BTC', null).map((m) => m.id), [line.id], 'synced drawings show in every BTC session')
-assert.deepEqual(store.listChartMarks('c', 'ETH', null).length, 0, '…but not on other coins')
-assert.ok(store.events.some((event) => event.kind === 'chart.mark' && event.data.shared), 'sync publishes a drawing change')
-const reopened = new HyperStore(dir)
-assert.deepEqual(reopened.listChartMarks('b', 'BTC', null).map((m) => m.id), [line.id], 'sync survives restart')
-await remote.updateChartMark({ sessionId: 'b', id: line.id, patch: { color: '#ef5f6c' } })
-assert.equal(store.listChartMarks('a', 'BTC', null)[0].color, '#ef5f6c', 'any session can edit a synced drawing')
-await remote.updateChartMark({ sessionId: 'a', id: line.id, patch: { shared: false } })
-assert.equal(store.listChartMarks('b', 'BTC', null).length, 0); assert.equal(store.listChartMarks('a', 'BTC', null).length, 1, 'unsync returns it to its session')
-const sharedRay = await remote.drawChartMark({ sessionId: 'b', coin: 'BTC', interval: '1h', kind: 'ray', label: '上升趋势', shared: true,
+await assert.rejects(remote.updateChartMark({ sessionId: 'b', id: line.id, patch: { color: '#ef5f6c' } }), /不属于/, 'another session cannot edit it')
+const kept = await remote.updateChartMark({ sessionId: 'a', id: line.id, patch: { shared: true } })
+assert.equal(kept.shared, undefined, 'the old sync flag is ignored')
+assert.ok(store.events.filter((event) => event.kind === 'chart.mark').every((event) => event.data.sessionId), 'drawing events always name their session')
+const ray = await remote.drawChartMark({ sessionId: 'b', coin: 'BTC', interval: '1h', kind: 'ray', label: '上升趋势',
   points: [{ time: now - 4 * 3600_000, price: 90 }, { time: now - 2 * 3600_000, price: 95 }] })
-assert.equal(store.listChartMarks('a', 'BTC', null).filter((m) => m.shared).length, 1)
+assert.deepEqual(store.listChartMarks('a', 'BTC', null).map((m) => m.id), [line.id])
+
+// Drawings synced by older builds return to the session that drew them.
+const legacyDir = mkdtempSync(join(tmpdir(), 'dhl-sync-legacy-'))
+const legacy = new HyperStore(legacyDir)
+legacy.registerSession('x', { coin: 'BTC' }); legacy.registerSession('y', { coin: 'BTC' })
+writeFileSync(join(legacyDir, 'shared-chart-marks.json'), JSON.stringify([{ id: 'old', sessionId: 'x', coin: 'BTC', interval: '1h', kind: 'level', price: 1, label: '旧线', shared: true, sharedScopeId: 'x' }]))
+const migrated = new HyperStore(legacyDir)
+assert.deepEqual(migrated.listChartMarks('x', 'BTC', null).map((m) => [m.id, m.shared]), [['old', undefined]])
+assert.deepEqual(migrated.listChartMarks('y', 'BTC', null), [])
+assert.ok(!existsSync(join(legacyDir, 'shared-chart-marks.json')))
 
 // ── alerts ──
 assert.equal(linePriceAt({ kind: 'level', price: 7 }, now), 7)
@@ -56,12 +59,12 @@ assert.deepEqual(remote.checkDrawingAlerts(now + 6000, { BTC: 99 }), [], 'a fire
 await remote.updateChartMark({ sessionId: 'a', id: line.id, patch: { alert: true } })
 assert.equal(store.listChartMarks('a', 'BTC', null).find((m) => m.id === line.id).alertTriggeredAt, undefined, 're-arming clears the last trigger')
 remote.checkDrawingAlerts(now + 8000, { BTC: 99 }); assert.equal(remote.checkDrawingAlerts(now + 9000, { BTC: 101 }).length, 1, 're-armed alert fires again')
-// A synced ray: the line rises 2.5/h; the alert compares against the line price at that moment.
-await remote.updateChartMark({ sessionId: 'b', id: sharedRay.id, patch: { alert: true } })
-const rayNow = linePriceAt(store.listChartMarks('a', 'BTC', null).find((m) => m.id === sharedRay.id), now)
+// A ray: the line rises 2.5/h; the alert compares against the line price at that moment.
+await remote.updateChartMark({ sessionId: 'b', id: ray.id, patch: { alert: true } })
+const rayNow = linePriceAt(store.listChartMarks('b', 'BTC', null).find((m) => m.id === ray.id), now)
 remote.checkDrawingAlerts(now, { BTC: rayNow + 1 })
 const down = remote.checkDrawingAlerts(now, { BTC: rayNow - 1 })
-assert.equal(down.length, 1); assert.equal(down[0].direction, 'down'); assert.equal(down[0].shared, true, 'synced drawings alert every session')
+assert.equal(down.length, 1); assert.equal(down[0].direction, 'down'); assert.equal(down[0].sessionId, 'b', 'an alert belongs to the session that drew the line')
 
 // ── stickers ──
 assert.ok(isIconLabel('flag') && isIconLabel('emoji:🚀') && isIconLabel('emoji:🐻'))
@@ -70,4 +73,4 @@ assert.ok(!isIconLabel('emoji:🍕🍕') && !isIconLabel('emoji:abc') && !isIcon
 await assert.rejects(remote.drawChartMark({ sessionId: 'a', coin: 'BTC', interval: '1h', kind: 'icon', label: 'emoji:hello', points: [{ time: now, price: 1 }] }), /贴图库/)
 assert.equal((await remote.drawChartMark({ sessionId: 'a', coin: 'BTC', interval: '1h', kind: 'icon', label: 'emoji:🦄', points: [{ time: now, price: 1 }] })).label, 'emoji:🦄')
 assert.equal((await remote.drawChartMark({ sessionId: 'a', coin: 'BTC', interval: '1h', kind: 'icon', label: 'emoji:🚀', points: [{ time: now, price: 1 }] })).label, 'emoji:🚀')
-console.log('画线跨会话同步、价格穿越提醒（触发一次、可重新开启）与贴图库校验通过')
+console.log('画线按会话独立、价格穿越提醒（触发一次、可重新开启）与贴图库校验通过')

@@ -7,6 +7,7 @@
  * @module src/client/data
  */
 
+import { placeholderDeskSessions, readNativeSessionList } from './native-session-list'
 import { getContext, hyperCall, t, tr } from './remote'
 import { getActiveRef, notify, store } from './store'
 import type { Candle, ChartMark, DeskState, Interval, SessionWorkspace } from './types'
@@ -375,37 +376,28 @@ export function loadTradeHistory(force = false): Promise<void> {
   return task
 }
 
-const titleAttempts = new Set<string>()
+const titleRestores = new Map<string, unknown>()
 
 /**
- * Give a desk session an explicit title.
- *
- * DSH's display title is `durable title → cwd directory basename → id`; desk
- * sessions are created without a title, so the home directory basename (the
- * account name, e.g. "liepin") would be shown. Naming them once keeps the
- * default neutral and is durable, so a manual rename is never overwritten.
- * @param sessionId - the desk session to name.
- * @param title - the label to store; defaults to the neutral "未命名".
+ * Hand desk sessions that older builds pinned to the 「未命名」 placeholder back
+ * to DSH's automatic titling. Retried only when the session's catalog row
+ * changes (its first message arrives), one request per session at a time.
+ * @param byId - the native session catalog, keyed by session id.
  */
-export async function titleDeskSession(sessionId: string, title = tr('未命名', 'Untitled')): Promise<void> {
-  if (!sessionId || titleAttempts.has(sessionId)) return
-  const sessionsSvc = getContext()?.get('sessions')
-  if (!sessionsSvc?.using) return
-  try {
-    await sessionsSvc.using(sessionId, { source: 'dsh-hyperliquid.title' }, async (ref: any) => {
-      await ref.ready
-      await ref.binding?.session?.rename?.(title)
-    })
-    // Remembered only after the host accepted the rename; a session the catalog
-    // has not committed yet retries on the next catalog update.
-    titleAttempts.add(sessionId)
-  } catch { /* the title is cosmetic; never block the desk */ }
+export function restoreDeskAutoTitles(byId: Record<string, { title?: string } | undefined>): void {
+  for (const id of placeholderDeskSessions(byId, store.get().sessions.map((row) => row.sessionId))) {
+    const row = byId[id]
+    if (titleRestores.get(id) === row) continue
+    titleRestores.set(id, row)
+    void hyperCall('restoreAutoTitle', { sessionId: id }).catch(() => { /* the next catalog change retries */ })
+  }
 }
 
 export async function loadSessions(): Promise<void> {
   try {
     const res = await hyperCall('sessions')
     store.patch({ sessions: res.sessions ?? [], sessionsLoaded: true })
+    restoreDeskAutoTitles(readNativeSessionList(getContext()?.get('sessions')?.list)?.byId ?? {})
   } catch { /* transient */ }
 }
 
@@ -450,8 +442,8 @@ export async function pollEvents(): Promise<void> {
         if (ev.kind === 'wallet.changed') resetWalletView()
         if (ev.kind === 'custody.changed') void loadStatus()
         if (ev.kind === 'paper.fill' || ev.kind?.startsWith('live.order.')) { void loadAccount(); void loadTradeHistory(true) }
-        if (ev.kind === 'chart.mark' && (ev.data?.sessionId === store.get().activeSessionId || (ev.data?.shared && ev.data?.coin === store.get().activeCoin))) void loadChartMarks()
-        if (ev.kind === 'chart.alert' && (ev.data?.sessionId === store.get().activeSessionId || (ev.data?.shared && ev.data?.sharedScopeId === (store.get().sessions.find((row) => row.sessionId === store.get().activeSessionId)?.strategyScopeId ?? store.get().activeSessionId)))) {
+        if (ev.kind === 'chart.mark' && ev.data?.sessionId === store.get().activeSessionId) void loadChartMarks()
+        if (ev.kind === 'chart.alert' && ev.data?.sessionId === store.get().activeSessionId) {
           notify(tr(`${ev.data.coin} 价格${ev.data.direction === 'up' ? '上穿' : '下穿'}「${ev.data.label}」：${ev.data.price}`, `${ev.data.coin} crossed ${ev.data.direction === 'up' ? 'above' : 'below'} "${ev.data.label}": ${ev.data.price}`))
           if (ev.data.coin === store.get().activeCoin) void loadChartMarks()
         }

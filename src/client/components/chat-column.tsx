@@ -84,8 +84,7 @@ export function ChatColumn({ width, fill = false, onCollapse, SessionProvider, r
 
   const title = React.useMemo(() => {
     if (!activeId) return ''
-    const row = readNativeSessionList(getContext()?.get('sessions')?.list)?.byId?.[activeId]
-    return s.sessionTitles?.[activeId] ?? row?.displayTitle ?? s.sessions.find((r) => r.sessionId === activeId)?.title ?? t('session.defaultTitle', 'Hyperliquid 交易会话')
+    return s.sessionTitles?.[activeId] ?? s.sessions.find((r) => r.sessionId === activeId)?.title ?? t('session.defaultTitle', 'Hyperliquid 交易会话')
   }, [activeId, s.sessions, s.sessionTitles, s.localeRevision])
   const readyRef = ref?.sessionId === activeId ? ref : null
   const pendingQuotes = s.chartReferences.filter((item) => item.sessionId === activeId)

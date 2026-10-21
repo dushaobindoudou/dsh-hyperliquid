@@ -45,7 +45,7 @@ export const DrawingList = React.memo(function DrawingList({ marks, locked, onSe
             <button type="button" className="dhl-drawing-list-name" title={tr('在图上定位并选中', 'Find and select on the chart')} onClick={() => { onSelect(mark.id); setOpen(false) }} disabled={mark.hidden}>
               <span style={{ color: mark.color }}><ToolIcon kind={mark.kind} size={14} /></span>
               <b>{mark.label}</b>
-              <small>{mark.alert ? <span className="dhl-list-flag" title={tr('价格提醒已开启', 'Price alert armed')}><UiIcon name="bell" size={12} /></span> : null}{mark.shared ? <span className="dhl-list-flag" title={tr('已同步到共享会话', 'Synced to shared sessions')}><UiIcon name="sync" size={12} /></span> : null}{tr(tool.zh, tool.en)} · {mark.interval}{mark.visibleIntervals?.length ? tr(` · 仅 ${mark.visibleIntervals.join('/')} 显示`, ` · ${mark.visibleIntervals.join('/')} only`) : ''}{mark.source === 'agent' ? ' · agent' : ''}</small>
+              <small>{mark.alert ? <span className="dhl-list-flag" title={tr('价格提醒已开启', 'Price alert armed')}><UiIcon name="bell" size={12} /></span> : null}{tr(tool.zh, tool.en)} · {mark.interval}{mark.visibleIntervals?.length ? tr(` · 仅 ${mark.visibleIntervals.join('/')} 显示`, ` · ${mark.visibleIntervals.join('/')} only`) : ''}{mark.source === 'agent' ? ' · agent' : ''}</small>
             </button>
             <button type="button" aria-pressed={!mark.hidden} title={mark.hidden ? tr('显示', 'Show') : tr('隐藏', 'Hide')} aria-label={`${mark.hidden ? tr('显示', 'Show') : tr('隐藏', 'Hide')} ${mark.label}`} onClick={() => onEdit(mark.id, { hidden: !mark.hidden })}>
               <UiIcon name={mark.hidden ? 'eyeOff' : 'eye'} size={14} />

@@ -61,6 +61,8 @@ export interface SessionRow {
   strategyScopeId?: string
   tradingEnabled?: boolean
   requirePosition?: boolean
+  watch?: boolean
+  watchInterval?: string
 }
 
 export interface MarketEntry {
@@ -116,8 +118,6 @@ export interface ChartMark {
   lineStyle?: 'solid' | 'dashed' | 'dotted'
   locked?: boolean
   hidden?: boolean
-  /** Synced to every trading session of this coin. */
-  shared?: boolean
   /** Price-cross alert armed (fires once). */
   alert?: boolean
   alertTriggeredAt?: number

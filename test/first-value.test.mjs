@@ -105,6 +105,11 @@ const scopedRemote = { cfg: { tradingMode: 'live', network: 'mainnet' }, isManag
 assert.equal(deskPromptFor(scopedRemote, 'session-plain'), '', 'non-desk sessions get no persona')
 scoped.registerSession('session-plain')
 assert.ok(deskPromptFor(scopedRemote, 'session-plain').includes('交易副手'), 'a registered desk session gets the persona')
+assert.match(deskPromptFor(scopedRemote, 'session-plain'), /本会话盯盘：已关闭/, 'every turn states the live 盯盘 state')
+scoped.configureSession('session-plain', { watch: true })
+assert.match(deskPromptFor(scopedRemote, 'session-plain'), /本会话盯盘：已开启（BTC 15m/, 'a desk toggle is seen on the next turn')
+scoped.configureSession('session-plain', { watch: false })
+assert.match(deskPromptFor(scopedRemote, 'session-plain'), /本会话盯盘：已关闭/)
 // ── HIP-3 alerts fire (their mids are not in core allMids) and reach the waker ──
 const alertStore = new HyperStore(mkdtempSync(join(tmpdir(), 'dhl-hip3-alert-')))
 alertStore.registerSession('s9', { coin: 'xyz:XYZ100' })

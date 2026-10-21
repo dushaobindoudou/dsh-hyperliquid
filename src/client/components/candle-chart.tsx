@@ -1382,14 +1382,14 @@ export function CandleChart({ candles, marks, indicators, expanded, resetToken, 
             const selected = selectedId === mark.id || group.includes(mark.id)
             if (interval && mark.visibleIntervals?.length && !mark.visibleIntervals.includes(interval)) return null
             // Off-screen culling: a bounded drawing entirely left or right of the plot renders nothing.
-            // Kept: drawings whose label or alert / shared badge is clamped into the plot even when the anchors are not.
-            const clampedDecoration = !(mark.source === 'user' || mark.kind === 'level') || Boolean(mark.alert) || Boolean(mark.shared)
+            // Kept: drawings whose label or alert badge is clamped into the plot even when the anchors are not.
+            const clampedDecoration = !(mark.source === 'user' || mark.kind === 'level') || Boolean(mark.alert)
             if (!selected && !clampedDecoration && !mark.extendLeft && !mark.extendRight && FINITE_KINDS.has(mark.kind) && offscreen(shown, view)) return null
             return <DrawingShape key={mark.id} id={mark.id} kind={mark.kind} points={shown} view={view} text={mark.label}
               dataVersion={mark.kind === 'vprofile' || mark.kind === 'regression' || mark.kind === 'avwap' || mark.kind === 'avprofile' || mark.kind === 'barspattern' || mark.kind === 'ghostfeed' ? candles : undefined}
               className={`dhl-drawing ${roleClass(mark)}${mark.kind === 'level' ? ' is-level' : ''}${selected ? ' selected' : ''}${mark.locked || drawingsLocked ? ' locked' : ''}`}
               label={mark.source === 'user' || mark.kind === 'level' ? undefined : mark.label} anchors={selected} interactive={!drawMode}
-              color={mark.color} lineWidth={mark.lineWidth} lineStyle={mark.lineStyle} alert={mark.alert} shared={mark.shared} rows={mark.rows} valueArea={mark.valueArea} levels={mark.levels} fontSize={mark.fontSize} bold={mark.bold} italic={mark.italic} fillOpacity={mark.fillOpacity} extendLeft={mark.extendLeft} extendRight={mark.extendRight} screenX={screen?.x} screenY={screen?.y} />
+              color={mark.color} lineWidth={mark.lineWidth} lineStyle={mark.lineStyle} alert={mark.alert} rows={mark.rows} valueArea={mark.valueArea} levels={mark.levels} fontSize={mark.fontSize} bold={mark.bold} italic={mark.italic} fillOpacity={mark.fillOpacity} extendLeft={mark.extendLeft} extendRight={mark.extendRight} screenX={screen?.x} screenY={screen?.y} />
           })}
           <g className="dhl-fills">
             {fills.map((event) => {

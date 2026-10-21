@@ -18,7 +18,7 @@ const start = (source) => {
 
 // Switch off: automatic rounds may reduce risk or cancel, but may not open.
 start({ kind: 'schedule' })
-assert.throws(() => guard('hyper_decide', { action: 'place', stopLossPx: 95 }, exec), /自动通知/)
+assert.throws(() => guard('hyper_decide', { action: 'place', stopLossPx: 95 }, exec), /未开启盯盘/)
 enabled = true
 // With the switch on, automatic rounds may open only with a stop loss.
 guard('hyper_decide', { action: 'place', stopLossPx: 95 }, exec)
@@ -35,6 +35,11 @@ assert.throws(() => guard('hyper_order', { action: 'place' }, exec), /必须带�
 start({ kind: 'plugin:dsh-hyperliquid', form: 'market-bar' })
 guard('hyper_account', { action: 'transfer' }, exec)
 assert.throws(() => guard('hyper_account', { action: 'withdraw' }, exec), /提现/, 'withdrawal is never permitted')
+assert.throws(() => guard('hyper_session', { action: 'watch', on: true }, exec), /只能由用户开启/, 'an automatic round never turns 盯盘 on')
+guard('hyper_session', { action: 'watch', on: false }, exec)
+start({ kind: 'user' })
+guard('hyper_session', { action: 'watch', on: true }, exec)
+start({ kind: 'plugin:dsh-hyperliquid', form: 'market-bar' })
 
 // After a plugin reload, the persisted origin must still enforce the stop requirement.
 const reloaded = createTurnOriginGuard({ on: () => {} }, {
@@ -53,12 +58,12 @@ guard('hyper_order', { action: 'place', stopLossPx: 95 }, exec)
 // Switch off again: degraded allowance only.
 enabled = false
 start({ kind: 'schedule' })
-assert.throws(() => guard('hyper_order', { action: 'place', stopLossPx: 95 }, exec), /自动通知/)
+assert.throws(() => guard('hyper_order', { action: 'place', stopLossPx: 95 }, exec), /未开启盯盘/)
 guard('hyper_order', { action: 'place', reduceOnly: true }, exec)
 guard('hyper_order', { action: 'cancel', oid: 2 }, exec)
 assert.throws(() => guard('hyper_order', { action: 'place' }, exec), /必须带有效 stopLossPx/)
-assert.throws(() => guard('hyper_order', { action: 'leverage', leverage: 5 }, exec), /自动通知/)
-assert.throws(() => guard('hyper_account', { action: 'limits' }, exec), /自动通知/)
+assert.throws(() => guard('hyper_order', { action: 'leverage', leverage: 5 }, exec), /未开启盯盘/)
+assert.throws(() => guard('hyper_account', { action: 'limits' }, exec), /未开启盯盘/)
 assert.throws(() => guard('hyper_account', { action: 'withdraw' }, exec), /提现/)
 
 console.log('automatic order gate: opens require a stop loss; switch-off allows risk reduction only')
