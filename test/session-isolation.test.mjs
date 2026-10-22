@@ -73,6 +73,37 @@ view = sessionExposure({ ...args, fills: [fill(99, 'A', 0.5, 3, 3), ...args.fill
 assert.equal(view.ownershipConfirmed, false, 'external reduction must be reconciled')
 assert.equal(sessionExposure({ ...args, network: 'mainnet' }).sessionSize, 0, 'no network leakage')
 
+// 2026-10-22 10:19:35 (+08, testnet): two stop losses of one 0.012 long fired in the same
+// millisecond. Hyperliquid returned their partial fills interleaved by tid rather than along
+// the position path, so the old replay went negative and every later close was refused with
+// "会话仓位归属未确认" (19 rounds). Rebuild the same-ms group from startPosition instead.
+const concurrentRecords = {
+  cstopA: { sessionId: 'b', coin: 'BTC', network: 'testnet', address: 'wallet', orderIds: [63354917368] },
+  cstopB: { sessionId: 'b', coin: 'BTC', network: 'testnet', address: 'wallet', orderIds: [63353938095] },
+  copen: { sessionId: 'b', coin: 'BTC', network: 'testnet', address: 'wallet', orderIds: [63355473886] },
+}
+const triggerFill = (oid, tid, sz, startPosition) => ({ coin: 'BTC', oid, tid, side: 'A', sz, startPosition, time: 1792625975207 })
+const concurrent = [
+  triggerFill(63354917368, 114314779971775, 0.006, 0.006),
+  triggerFill(63353938095, 283850736457451, 0.002, 0.008),
+  triggerFill(63353938095, 206634221900449, 0.0005, 0.0085),
+  triggerFill(63353938095, 808208746418750, 0.00059, 0.00909),
+  triggerFill(63353938095, 875422283580507, 0.00028, 0.00937),
+  triggerFill(63353938095, 664188096699416, 0.0005, 0.00987),
+  triggerFill(63353938095, 312407212545421, 0.00014, 0.01001),
+  triggerFill(63353938095, 7501018119356, 0.00048, 0.01049),
+  triggerFill(63353938095, 1101694665039835, 0.001, 0.01149),
+  triggerFill(63353938095, 436624758211061, 0.0005, 0.01199),
+  triggerFill(63353938095, 171881847965459, 0.00001, 0.012),
+  { coin: 'BTC', oid: 63355473886, tid: 1061694428531736, side: 'B', sz: 0.00431, startPosition: 0.00069, time: 1792626272359 },
+  { coin: 'BTC', oid: 63355473886, tid: 81411774338566, side: 'B', sz: 0.00059, startPosition: 0.0001, time: 1792626272359 },
+  { coin: 'BTC', oid: 63355473886, tid: 893055151889145, side: 'B', sz: 0.0001, startPosition: 0, time: 1792626272359 },
+]
+const rebuilt = sessionExposure({ sessionId: 'b', coin: 'BTC', size: 0.005, fills: concurrent, records: concurrentRecords, network: 'testnet', address: 'wallet' })
+assert.equal(rebuilt.ownershipConfirmed, true, 'concurrent stops keep the position path attributable')
+assert.ok(Math.abs(rebuilt.sessionSize - 0.005) < 1e-9)
+assertSessionIntent(rebuilt, { coin: 'BTC', isBuy: false, sz: 0.005, reduceOnly: true })
+
 // Hyperliquid returns TPSL children with cloid null and no child oid in the receipt, so a
 // bracket is attributed by its own protective prices instead of the (missing) cloid.
 const bracket = {
