@@ -6,7 +6,7 @@ import { HyperStore } from '../lib/store.js'
 import { HyperRemote } from '../lib/remote.js'
 import { buildToolDefinitions } from '../lib/tools.js'
 import { createStrategyBarMonitor, sessionWatch } from '../lib/strategy-monitor.js'
-import { frameLine, protectionLine, watchDigest } from '../lib/watch-digest.js'
+import { frameLine, planLine, protectionLine, watchDigest } from '../lib/watch-digest.js'
 import { marketBarWakeText } from '../lib/wake.js'
 
 // ── A fake live exchange: trigger orders rest until cancelled; fills are what the test says ──
@@ -178,6 +178,11 @@ const fill = (oid, side, sz, startPosition, time) => ({ coin: 'BTC', oid, tid: t
     sessionExecution: async () => ({ ownershipConfirmed: true, sessionId: 's', sessionSize: 0 }) }, { sessionId: 's', coin: 'BTC', interval: '15m', now })
   assert.deepEqual(asked.map(([interval]) => interval), ['15m', '1h', '4h', '1d'], 'the watch interval plus two higher frames and the daily regime')
   assert.ok(lines.some((line) => line.startsWith('4h：')) && lines.includes('本会话：空仓。') && lines.some((line) => line.includes('[v8]') && line.includes('82,350')))
+  const journal = { strategies: [], entries: [{ type: 'plan', sessionId: 's', coin: 'BTC', at: now - 2 * HOUR, text: '加仓到 0.018' }] }
+  assert.match(planLine(journal, { sessionId: 's', coin: 'BTC', now }), /0\.018/)
+  assert.equal(planLine(journal, { sessionId: 's', coin: 'BTC', now: now + 25 * HOUR }), null, 'a day-old plan is not re-issued every round')
+  journal.entries.push({ type: 'trade', sessionId: 's', coin: 'BTC', at: now - HOUR, resultR: -1, text: 'stopped' })
+  assert.equal(planLine(journal, { sessionId: 's', coin: 'BTC', now }), null, 'a plan closed by a trade is no longer in force')
   const text = marketBarWakeText([{ coin: 'BTC', interval: '15m', candle: { t: now, o: 1, h: 1, l: 1, c: 1, v: 1 }, strategyIds: ['v8'], digest: lines }])
   assert.ok(text.indexOf('交易台快照') > 0 && text.indexOf('交易台快照') < text.indexOf('1. 判市'), 'facts come before the protocol')
   assert.match(text, /ask_user_question/); assert.match(text, /下一根盯盘周期收盘/)
