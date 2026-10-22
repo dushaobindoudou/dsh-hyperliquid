@@ -63,8 +63,12 @@ const args = { sessionId: 'b', coin: 'BTC', size: 3, fills: [fill(2, 'B', 2, 1, 
 let view = sessionExposure(args)
 assert.equal(view.sessionSize, 2)
 assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 2, reduceOnly: true })
-assert.throws(() => assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 2, reduceOnly: true }, [{ sessionId: 'b', coin: 'BTC', sz: 2, reduceOnly: true }]), /在途离场/)
-assert.throws(() => assertSessionIntent({ ...view, pendingExits: [{ sessionId: 'b', sz: 2, reduceOnly: true }] }, { coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }), /止盈止损/)
+// Own confirmed TP/SL no longer force a cancel-first (that left 2026-10-22's long naked for 4.5h);
+// the tool trims them after the fill. Only an order whose exchange outcome is unknown blocks.
+assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 2, reduceOnly: true }, [{ sessionId: 'b', coin: 'BTC', sz: 2, reduceOnly: true, status: 'accepted' }])
+assertSessionIntent({ ...view, pendingExits: [{ sessionId: 'b', sz: 2, reduceOnly: true }] }, { coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true })
+assert.throws(() => assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }, [{ sessionId: 'b', coin: 'BTC', status: 'unknown' }]), /结果未确认/)
+assert.throws(() => assertSessionIntent({ ...view, ownershipConfirmed: false }, { coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }), /action=protect/, 'the lock names the way out')
 assert.throws(() => assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 3, reduceOnly: true }), /本会话/)
 assert.throws(() => assertSessionIntent(view, { coin: 'BTC', isBuy: false, sz: 1 }), /反向仓位冲突/)
 view = sessionExposure({ ...args, fills: [fill(3, 'A', 1, 3, 3), ...args.fills], size: 2 })
@@ -172,7 +176,7 @@ await HyperRemote.prototype.account.call(live, { sessionId: 'b', coin: 'BTC' })
 assert.equal(fillReads, 1); assert.equal(historyReads, 1, 'UI polling reuses weighted history across chats and contracts')
 live.orders = async () => ({ orders: open })
 open = [{ coin: 'BTC', oid: 3, reduceOnly: true, isTrigger: true, cloid: 'ca' }]
-await assert.rejects(live.checkSessionOrder({ coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }, 'a', { address: 'wallet', positionSize: 3 }), /止盈止损/)
+await live.checkSessionOrder({ coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }, 'a', { address: 'wallet', positionSize: 3 })
 open = []
 await live.checkSessionOrder({ coin: 'BTC', isBuy: false, sz: 1, reduceOnly: true }, 'a', { address: 'wallet', positionSize: 3 })
 assert.ok(fillReads >= 3, 'execution never relies on cached allocation evidence')

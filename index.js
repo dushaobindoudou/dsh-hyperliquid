@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto'
 import { deskPromptFor } from './lib/prompt.js'
 import { createAgentWaker, marketBarWakeText } from './lib/wake.js'
 import { createStrategyBarMonitor } from './lib/strategy-monitor.js'
+import { watchDigest } from './lib/watch-digest.js'
 import { createTurnOriginGuard } from './lib/turn-origin.js'
 import { HyperRemote } from './lib/remote.js'
 import { buildToolDefinitions } from './lib/tools.js'
@@ -132,7 +133,7 @@ export function apply(ctx, config = {}) {
         return true
       },
     })
-    const monitor = createStrategyBarMonitor(remote, { notify: (event) => waker.notify(event) })
+    const monitor = createStrategyBarMonitor(remote, { notify: (event) => waker.notify(event), enrich: (event) => watchDigest(remote, event) })
     const timer = setInterval(() => { void monitor.check().catch((error) => ctx.logger?.warn?.('[dsh-hyperliquid] strategy monitor', error)) }, 15_000)
     timer.unref?.()
     void monitor.check().catch((error) => ctx.logger?.warn?.('[dsh-hyperliquid] strategy monitor', error))

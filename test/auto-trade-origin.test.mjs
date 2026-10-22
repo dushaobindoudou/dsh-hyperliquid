@@ -19,6 +19,7 @@ const start = (source) => {
 // Switch off: automatic rounds may reduce risk or cancel, but may not open.
 start({ kind: 'schedule' })
 assert.throws(() => guard('hyper_decide', { action: 'place', stopLossPx: 95 }, exec), /未开启盯盘/)
+guard('hyper_order', { action: 'protect', stopLossPx: 95 }, exec) // moving or adding a stop never adds risk
 enabled = true
 // With the switch on, automatic rounds may open only with a stop loss.
 guard('hyper_decide', { action: 'place', stopLossPx: 95 }, exec)
